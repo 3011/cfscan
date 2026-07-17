@@ -4,6 +4,11 @@ All notable public changes are documented here.
 
 ## [1.0.0] - 2026-07-17
 
+### Security
+
+- Updated `chi`, `pgx`, and `golang.org/x/crypto` to patched release lines before the first public release.
+- Added CodeQL, Gitleaks, Dependabot, dependency review, and GitHub secret-scanning guidance.
+
 ### Added
 
 - Initial public release of the Center, regional Agent, PostgreSQL store, and React management console.

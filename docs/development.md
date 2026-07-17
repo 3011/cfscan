@@ -4,18 +4,14 @@
 
 | 工具 | 建议版本 |
 |---|---|
-| Go | 1.24.4 |
+| Go | 1.25 or newer |
 | Node.js | 22 |
 | pnpm | 11.12.x（以 `web/package.json` 为准） |
 | PostgreSQL | 17 |
 | Docker / Compose | 用于本地一键环境和镜像构建 |
 | Chromium | 运行 `pnpm test:ui` 时需要 |
 
-如果系统默认 Go 安装缺少标准库源码，可显式指定完整工具链：
-
-```bash
-GO=/opt/go1.24.4/bin/go make check
-```
+Go 可使用官方工具链自动选择功能。保持 `GOTOOLCHAIN=auto`，然后运行 `make check`；CI 会根据 `go.mod` 安装所需版本。
 
 ## 快速启动
 
