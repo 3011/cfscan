@@ -51,14 +51,20 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: '0'
         run: |
-          archive_dir="release/cfscan-linux-${GOARCH}"
-          archive_file="release/cfscan-linux-${GOARCH}.tar.gz"
+          archive_name="cfscan-linux-${GOARCH}"
+          staging_root="${RUNNER_TEMP}/cfscan-release-${GOARCH}"
+          archive_dir="${staging_root}/${archive_name}"
           mkdir -p "$archive_dir"
           go build -trimpath -ldflags='-s -w' -o "$archive_dir/cfscan-server" ./cmd/server
           go build -trimpath -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" -o "$archive_dir/cfscan-agent" ./cmd/agent
+          if go version -m "$archive_dir/cfscan-agent" | grep -q $'\tvcs.modified=true'; then
+            echo "Refusing to publish a binary built from a dirty worktree" >&2
+            exit 1
+          fi
           cp LICENSE NOTICE CHANGELOG.md "$archive_dir/"
-          tar -C release -czf "$archive_file" "cfscan-linux-${GOARCH}"
-          (cd release && sha256sum "cfscan-linux-${GOARCH}.tar.gz" > "cfscan-linux-${GOARCH}.tar.gz.sha256")
+          mkdir -p release
+          tar -C "$staging_root" -czf "release/${archive_name}.tar.gz" "$archive_name"
+          (cd release && sha256sum "${archive_name}.tar.gz" > "${archive_name}.tar.gz.sha256")
       - uses: actions/upload-artifact@v7
         with:
           name: binaries-${{ matrix.goarch }}
