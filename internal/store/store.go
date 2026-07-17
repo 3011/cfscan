@@ -21,6 +21,17 @@ type Store interface {
 	DeleteUser(context.Context, string) error
 
 	RegisterAgent(context.Context, model.AgentRegistration) (model.Agent, error)
+	CreateAgentEnrollment(context.Context, model.CreateAgentEnrollment) (model.AgentEnrollment, error)
+	GetAgentEnrollment(context.Context, string) (model.AgentEnrollment, error)
+	GetAgentEnrollmentByID(context.Context, string) (model.AgentEnrollment, error)
+	ListAgentEnrollments(context.Context) ([]model.AgentEnrollment, error)
+	ApproveAgentEnrollment(context.Context, string, model.ApproveAgentEnrollmentRequest) (model.AgentEnrollment, error)
+	ApproveAgentEnrollmentByID(context.Context, string, model.ApproveAgentEnrollmentRequest) (model.AgentEnrollment, error)
+	RejectAgentEnrollment(context.Context, string) (model.AgentEnrollment, error)
+	RejectAgentEnrollmentByID(context.Context, string) (model.AgentEnrollment, error)
+	ClaimAgentEnrollment(context.Context, string, string, string, string, string, string) (model.AgentEnrollment, error)
+	AuthenticateAgentCredential(context.Context, string, string) (string, error)
+	AuthorizeLegacyAgent(context.Context, string) error
 	Heartbeat(context.Context, string) error
 	ListAgents(context.Context) ([]model.Agent, error)
 	Overview(context.Context) (model.Overview, error)

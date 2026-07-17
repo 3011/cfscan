@@ -4,6 +4,90 @@ const baseURL = process.env.BASE_URL ?? 'http://127.0.0.1:4173'
 const username = process.env.CFSCAN_UI_USERNAME
 const password = process.env.CFSCAN_UI_PASSWORD
 
+const mockEnrollmentAPI = process.env.CFSCAN_UI_MOCK_ENROLLMENTS === '1'
+const mockPairingToken = crypto.randomUUID()
+const mockEnrollmentID = crypto.randomUUID()
+let mockEnrollmentStatus = 'pending'
+
+function mockEnrollment() {
+  const now = Date.now()
+  return {
+    id: mockEnrollmentID,
+    mode: 'device',
+    status: mockEnrollmentStatus,
+    requested_name: 'smoke-agent',
+    os: 'linux',
+    architecture: 'amd64',
+    version: 'v1.1.0-smoke',
+    requested_concurrency: 32,
+    name: mockEnrollmentStatus === 'pending' ? '' : 'smoke-agent',
+    region: mockEnrollmentStatus === 'pending' ? '' : 'Smoke Region',
+    continent: mockEnrollmentStatus === 'pending' ? '' : 'Asia',
+    concurrency: 32,
+    agent_id: mockEnrollmentStatus === 'claimed' ? crypto.randomUUID() : '',
+    expires_at: new Date(now + 10 * 60_000).toISOString(),
+    approved_at: mockEnrollmentStatus === 'approved' ? new Date(now).toISOString() : undefined,
+    created_at: new Date(now - 30_000).toISOString(),
+    updated_at: new Date(now).toISOString(),
+  }
+}
+
+async function installEnrollmentMocks(page) {
+  if (!mockEnrollmentAPI) return
+  await page.route('**/api/v1/agent-enrollments**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const method = request.method()
+    const headers = { 'X-CFScan-Server-Time': String(Date.now()) }
+    const fulfill = (status, body) => route.fulfill({ status, headers, contentType: 'application/json', body: JSON.stringify(body) })
+
+    if (method === 'GET' && path === '/api/v1/agent-enrollments/config') {
+      return fulfill(200, {
+        public_web_url: baseURL,
+        public_agent_url: 'https://agent.example.test',
+        agent_image: 'ghcr.io/3011/cfscan-agent:v1.1.0',
+        agent_version: 'v1.1.0',
+        ttl_seconds: 600,
+        poll_interval: 3,
+      })
+    }
+    if (method === 'GET' && path === '/api/v1/agent-enrollments') {
+      const item = mockEnrollment()
+      return fulfill(200, { items: ['pending', 'approved'].includes(item.status) ? [item] : [] })
+    }
+    if (method === 'POST' && path === '/api/v1/agent-enrollments/preauthorized') {
+      const input = JSON.parse(request.postData() || '{}')
+      return fulfill(201, {
+        enrollment: {
+          ...mockEnrollment(),
+          id: crypto.randomUUID(),
+          mode: 'preauthorized',
+          status: 'approved',
+          requested_name: input.name,
+          name: input.name,
+          region: input.region,
+          continent: input.continent,
+          concurrency: input.concurrency,
+        },
+        pairing_token: crypto.randomUUID(),
+        expires_in: Number(input.ttl_minutes || 30) * 60,
+      })
+    }
+    if (method === 'POST' && path.endsWith('/approve')) {
+      mockEnrollmentStatus = 'approved'
+      return fulfill(200, mockEnrollment())
+    }
+    if (method === 'POST' && path.endsWith('/reject')) {
+      mockEnrollmentStatus = 'rejected'
+      return fulfill(200, mockEnrollment())
+    }
+    if (method === 'GET' && (path.includes(`/agent-enrollments/${mockPairingToken}`) || path.includes(`/agent-enrollments/id/${mockEnrollmentID}`))) {
+      return fulfill(200, mockEnrollment())
+    }
+    return route.fallback()
+  })
+}
+
 if (!username || !password) {
   throw new Error('Set CFSCAN_UI_USERNAME and CFSCAN_UI_PASSWORD for an administrator smoke-test account.')
 }
@@ -73,6 +157,7 @@ try {
   await desktopContext.addInitScript(() => localStorage.setItem('theme', 'light'))
   const page = await desktopContext.newPage()
   captureErrors(page)
+  await installEnrollmentMocks(page)
   await login(page)
 
   for (const [route, heading] of routes) {
@@ -264,6 +349,33 @@ try {
   report.interactions.themeRadioSelection = await themeGroup.getByRole('radio', { name: '深色' }).isChecked()
   await themeGroup.getByRole('radio', { name: '浅色' }).click()
 
+  if (mockEnrollmentAPI) {
+    await page.goto(`${baseURL}/agents`, { waitUntil: 'domcontentloaded' })
+    await page.getByRole('heading', { level: 1, name: 'Agent 节点' }).waitFor()
+    await page.getByRole('button', { name: '添加 Agent' }).click()
+    const agentSheet = page.locator('[data-slot=sheet-content]')
+    await agentSheet.waitFor()
+    const deviceCommandVisible = (await agentSheet.innerText()).includes('cfscan-agent connect --server https://agent.example.test')
+    await agentSheet.getByRole('radio', { name: /自动化部署/ }).click()
+    await agentSheet.getByLabel('节点名称').fill('automated-smoke-agent')
+    await agentSheet.getByLabel('地区').fill('Smoke Region')
+    await agentSheet.getByRole('button', { name: '生成部署命令' }).click()
+    await agentSheet.getByText('一次性部署命令已生成', { exact: true }).waitFor()
+    const generatedCommandVisible = (await agentSheet.innerText()).includes('cfscan-agent join --server https://agent.example.test --token')
+    report.interactions.agentEnrollmentSheet = deviceCommandVisible && generatedCommandVisible
+    await agentSheet.getByRole('button', { name: '关闭' }).click()
+
+    mockEnrollmentStatus = 'pending'
+    await page.goto(`${baseURL}/agents/pair/${mockPairingToken}`, { waitUntil: 'domcontentloaded' })
+    await page.getByText('批准 Agent 连接', { exact: true }).waitFor()
+    await page.getByLabel('地区').fill('Smoke Region')
+    await page.getByRole('button', { name: '批准并连接' }).click()
+    await page.getByText('已批准，正在等待 Agent 完成连接', { exact: true }).waitFor()
+    report.interactions.agentEnrollmentApproval =
+      new URL(page.url()).pathname === `/agents/pair/${mockPairingToken}` &&
+      (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0
+  }
+
   await page.goto(`${baseURL}/sources`, { waitUntil: 'domcontentloaded' })
   await page.getByRole('heading', { level: 1, name: 'IP 数据源' }).waitFor()
   await page.getByRole('button', { name: '添加 ASN' }).click()
@@ -375,6 +487,7 @@ try {
   await mobileContext.addInitScript(() => localStorage.setItem('theme', 'dark'))
   const mobile = await mobileContext.newPage()
   captureErrors(mobile, 'mobile-')
+  await installEnrollmentMocks(mobile)
   await login(mobile)
 
   for (const [route, heading] of routes) {
@@ -390,6 +503,24 @@ try {
         errorBoundary: [...document.querySelectorAll('body *')].some((element) => element.textContent === '页面发生错误'),
       }))),
     })
+  }
+
+  if (mockEnrollmentAPI) {
+    await mobile.goto(`${baseURL}/agents`, { waitUntil: 'domcontentloaded' })
+    await mobile.getByRole('heading', { level: 1, name: 'Agent 节点' }).waitFor()
+    await mobile.getByRole('button', { name: '添加 Agent' }).click()
+    const mobileAgentSheet = mobile.locator('[data-slot=sheet-content]')
+    await mobileAgentSheet.waitFor()
+    report.interactions.mobileAgentEnrollmentSheet =
+      (await mobileAgentSheet.isVisible()) &&
+      (await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0
+    await mobileAgentSheet.getByRole('button', { name: '关闭' }).click()
+
+    mockEnrollmentStatus = 'pending'
+    await mobile.goto(`${baseURL}/agents/pair/${mockPairingToken}`, { waitUntil: 'domcontentloaded' })
+    await mobile.getByText('批准 Agent 连接', { exact: true }).waitFor()
+    report.interactions.mobileAgentEnrollmentApproval =
+      (await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0
   }
 
   await mobile.goto(`${baseURL}/settings`, { waitUntil: 'domcontentloaded' })

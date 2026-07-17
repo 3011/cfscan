@@ -17,7 +17,7 @@ A distributed Cloudflare Anycast IP scanning, ranking, automation, and monitorin
 
 CF Scanner coordinates lightweight regional Agents from a central Go service. Agents probe selected Cloudflare addresses while preserving HTTP Host and TLS SNI, then return TCP, TLS, TTFB, availability, CF-RAY, and colo measurements. The Center stores and ranks results per Agent, runs schedules, and manages temporary blacklist rechecks.
 
-- distributed outbound-only Agents;
+- distributed outbound-only Agents with browser-approved pairing and per-Agent credentials;
 - Cloudflare official and ASN prefix sources;
 - latest-result ranking and complete history;
 - server-side filters, sorting, pagination, and geographic facets;
@@ -36,12 +36,19 @@ Requirements: Docker with Compose support.
 
 ```bash
 cp .env.example .env
-docker compose --profile agent up -d --build
+docker compose up -d --build
 ```
 
 Open `http://localhost:18081` and sign in with the bootstrap administrator configured in `.env`.
 
-The example credentials are for local development only. Replace the Agent token and administrator password before any shared or Internet-accessible deployment.
+Start the optional local Agent, then open the pairing URL printed in its logs:
+
+```bash
+docker compose --profile agent up -d local-agent
+docker compose logs -f local-agent
+```
+
+Approve the request in the Web console. The Agent saves a per-Agent identity in the `agent-data` volume and reuses it after restarts. Local example values must not be reused in production.
 
 ## Architecture
 
@@ -54,7 +61,7 @@ React management console
  Asia Agent   Europe Agent   North America Agent
 ```
 
-See [`docs/architecture.md`](docs/architecture.md) for task leases, result semantics, automation, authentication boundaries, and database behavior.
+See [`docs/architecture.md`](docs/architecture.md) for task leases, result semantics, automation, authentication boundaries, and database behavior. Agent pairing and migration are documented in [`docs/agent-enrollment.md`](docs/agent-enrollment.md).
 
 ## Container images
 
@@ -84,7 +91,7 @@ Report vulnerabilities privately according to [`SECURITY.md`](SECURITY.md). Neve
 
 ## Project status
 
-The first public release is suitable for self-hosted use, but operators should review retention, backup, rate limits, and network policy for their environment. The current maintenance backlog is documented in [`docs/maintenance-audit.md`](docs/maintenance-audit.md).
+The project is suitable for self-hosted use, but operators should review retention, backup, rate limits, and network policy for their environment. The current maintenance backlog is documented in [`docs/maintenance-audit.md`](docs/maintenance-audit.md).
 
 ## License
 

@@ -1,5 +1,7 @@
 FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata
+RUN mkdir -p /var/lib/cfscan-agent && chown 65532:65532 /var/lib/cfscan-agent
+ENV CFSCAN_AGENT_IDENTITY_FILE=/var/lib/cfscan-agent/identity.json
 COPY bin/cfscan-agent /usr/local/bin/cfscan-agent
 USER 65532:65532
 ENTRYPOINT ["/usr/local/bin/cfscan-agent"]

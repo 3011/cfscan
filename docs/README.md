@@ -8,8 +8,9 @@
 
 1. [`../AGENTS.md`](../AGENTS.md)：改动边界、必跑检查和提交要求；
 2. [`architecture.md`](architecture.md)：中心、Agent、数据库和任务生命周期；
-3. [`development.md`](development.md)：本地启动、目录、测试和调试；
-4. [`operations.md`](operations.md)：环境变量、健康检查、发布与回滚。
+3. [`agent-enrollment.md`](agent-enrollment.md)：Agent 配对、独立凭据、CLI、Docker 和旧共享 Token迁移；
+4. [`development.md`](development.md)：本地启动、目录、测试和调试；
+5. [`operations.md`](operations.md)：环境变量、健康检查、发布与回滚。
 
 ### 前端与 UI
 
@@ -38,6 +39,7 @@
 |---|---|
 | `README.md` | 这个平台做什么、已经实现什么 |
 | `architecture.md` | 系统为什么这样设计、数据如何流转 |
+| `agent-enrollment.md` | Agent 如何配对、保存身份和迁移旧共享鉴权 |
 | `development.md` | 如何在本地开发和验证 |
 | `operations.md` | 如何配置、部署、监控和回滚 |
 | `design-system.md` | UI 技术基线和官方组件升级方式 |
@@ -69,6 +71,7 @@
 
 - 新增或修改环境变量：更新 `.env.example` 和 `operations.md`；
 - 新增 API、角色权限或任务状态：更新 `architecture.md`；
+- 修改 Agent配对、凭据或 CLI：更新 `agent-enrollment.md`；
 - 新增页面、路由或导航：更新 README 和相关 UI 文档；
 - 新增 UI primitive 或本地适配：更新 `design-system.md` 与 `ui-component-inventory.md`；
 - 改变组件选择规则：更新 `ui-component-guidelines.md`；

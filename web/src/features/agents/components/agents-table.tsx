@@ -40,7 +40,7 @@ export function AgentsTable({ agents }: { agents: Agent[] }) {
       accessorKey: 'name',
       meta: { label: '名称' },
       header: ({ column }) => <DataTableColumnHeader column={column} title="Agent" />,
-      cell: ({ row }) => <div><p className="font-medium">{row.original.name}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{row.original.id.slice(0, 8)}</p></div>,
+      cell: ({ row }) => <div><p className="font-medium">{row.original.name}</p><p className="mt-1 text-xs text-muted-foreground">{[row.original.os, row.original.architecture].filter(Boolean).join(' · ') || '平台信息未知'}</p></div>,
     },
     {
       accessorKey: 'continent',
@@ -68,10 +68,10 @@ export function AgentsTable({ agents }: { agents: Agent[] }) {
       cell: ({ row }) => <div><p><LiveRelativeTime value={row.original.last_seen_at} /></p><p className="text-xs text-muted-foreground">{formatDate(row.original.last_seen_at)}</p></div>,
     },
     {
-      accessorKey: 'created_at',
-      meta: { label: '注册时间' },
-      header: ({ column }) => <DataTableColumnHeader column={column} title="注册时间" />,
-      cell: ({ row }) => <span className="text-muted-foreground">{formatDate(row.original.created_at)}</span>,
+      accessorKey: 'version',
+      meta: { label: '版本' },
+      header: ({ column }) => <DataTableColumnHeader column={column} title="版本" />,
+      cell: ({ row }) => <div><p>{row.original.version || '未知'}</p>{row.original.auth_mode === 'legacy' ? <p className="mt-1 text-xs text-muted-foreground">旧共享鉴权</p> : null}</div>,
     },
   ], [])
 
@@ -87,7 +87,7 @@ export function AgentsTable({ agents }: { agents: Agent[] }) {
       renderMobileItem={(agent) => (
         <Card size="sm" className="gap-0 p-4 py-4">
           <div className="flex items-start justify-between gap-3"><div><p className="font-medium">{agent.name}</p><p className="mt-1 text-xs text-muted-foreground">{agent.continent} / {agent.region}</p></div><StatusBadge status={agent.status} /></div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-muted-foreground">并发</p><p className="mt-1 font-medium">{agent.concurrency}</p></div><div><p className="text-xs text-muted-foreground">最后心跳</p><p className="mt-1"><LiveRelativeTime value={agent.last_seen_at} /></p></div></div>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-muted-foreground">并发</p><p className="mt-1 font-medium">{agent.concurrency}</p></div><div><p className="text-xs text-muted-foreground">最后心跳</p><p className="mt-1"><LiveRelativeTime value={agent.last_seen_at} /></p></div><div><p className="text-xs text-muted-foreground">平台</p><p className="mt-1">{[agent.os, agent.architecture].filter(Boolean).join(' · ') || '未知'}</p></div><div><p className="text-xs text-muted-foreground">版本</p><p className="mt-1">{agent.version || '未知'}</p></div></div>
         </Card>
       )}
     />

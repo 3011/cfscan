@@ -13,7 +13,7 @@ Web（React / Nginx）
   ▼
 Center（Go / chi） ───────── PostgreSQL
   ▲                              │
-  │ Bearer Agent Token           ├─ 配置与账号
+  │ 独立 Bearer Agent Token      ├─ 配置与账号
   │ HTTPS JSON                   ├─ 任务租约
   │                              ├─ 扫描结果
 地区 Agent ──────────────────────└─ 黑名单与自动化记录
@@ -30,8 +30,9 @@ Center（Go / chi） ───────── PostgreSQL
 
 ### Agent
 
-- 无持久状态、只主动向中心发起出站请求；
-- 以配置的名称注册，同名 Agent 重启会更新原记录；
+- 只主动向中心发起出站请求，不需要入站控制端口；
+- 首次通过一次性 UUID 配对，成功后原子保存独立 `identity.json`；
+- 重启时复用已有身份，不重复创建 Agent；
 - 默认每 15 秒心跳、每 5 秒轮询任务；
 - 直接连接目标 IP，同时保留任务 Host 和 TLS SNI；
 - 并发执行探测并批量回传结果；
@@ -52,16 +53,22 @@ PostgreSQL 是配置、账号、会话、任务、结果和自动化状态的唯
 - 查看者直接调用写接口返回 `403 Forbidden`；
 - 登录接口有来源级失败限流。
 
-### Agent API
+### Agent 配对与 API
 
-路径位于 `/api/v1/agent/*`，使用统一 Bearer Token：
+新 Agent 先使用公开配对接口创建或领取一次性 Enrollment：
 
-- `register`：注册或更新 Agent；
+- `POST /api/v1/agent/enrollments`：Agent 创建待审批请求；
+- `POST /api/v1/agent/enrollments/claim`：轮询审批结果并领取独立身份。
+
+管理员通过应用会话读取、批准或拒绝 Enrollment；预授权自动化部署也创建同一模型，只是初始状态直接为 `approved`。只有成功领取时才创建正式 Agent。
+
+配对完成后，路径 `/api/v1/agent/*` 使用该 Agent 独立 Bearer Token：
+
 - `heartbeat`：刷新在线时间；
 - `tasks/claim`：领取租约批次；
 - `tasks/results`：幂等回传结果。
 
-Agent API 与管理会话相互独立。不要把 Agent Token 放入浏览器、URL、日志或仓库。
+独立 Token 与唯一 Agent ID绑定，Center 不信任请求体中的其他 `agent_id`。旧共享 Token和 `register` 接口仅用于迁移兼容。完整流程见 [`agent-enrollment.md`](agent-enrollment.md)。
 
 ## API 权限矩阵
 
@@ -73,7 +80,8 @@ Agent API 与管理会话相互独立。不要把 Agent Token 放入浏览器、
 | 读取管理数据 | Session Cookie，管理员或查看者 | overview、agents、sources、jobs、schedules、results、colos、blacklist、automation |
 | 修改业务数据 | Session Cookie，管理员 | 创建/停止任务、计划、数据源、同步和自动化配置 |
 | 账号管理 | Session Cookie，管理员 | `/api/v1/users/*` |
-| Agent | Bearer Agent Token | `/api/v1/agent/*` |
+| Agent 配对 | 无认证创建/领取；管理员会话批准 | `/api/v1/agent/enrollments*`、`/api/v1/agent-enrollments*` |
+| Agent 运行 | 独立 Bearer Agent Token；旧共享 Token仅迁移兼容 | `/api/v1/agent/*` |
 
 所有 JSON 错误使用统一结构：
 
@@ -87,6 +95,19 @@ Agent API 与管理会话相互独立。不要把 Agent Token 放入浏览器、
 ```
 
 请求体最大读取 4 MiB，拒绝未知 JSON 字段和多余 JSON 对象。所有 API 响应带 `X-CFScan-Server-Time` 毫秒时间头，用于 Web 时钟校准。
+
+
+## Agent Enrollment 生命周期
+
+```text
+Agent connect → pending → approved → claimed → 正式 Agent
+                    └→ rejected
+                    └→ expired
+
+Web 预授权 → approved → claimed → 正式 Agent
+```
+
+一次性 UUID只保存 SHA-256，默认 10 分钟有效且只能使用一次。Agent 本地生成长期随机 Secret，Center 只保存 Hash，因此领取响应丢失时同一 Agent 可以使用相同凭据幂等重试。
 
 ## 任务生命周期
 

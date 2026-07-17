@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/3011/cfscan/internal/model"
+	"github.com/3011/cfscan/internal/store"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -51,22 +52,30 @@ func (s *Store) Migrate(ctx context.Context) error {
 
 func (s *Store) RegisterAgent(ctx context.Context, input model.AgentRegistration) (model.Agent, error) {
 	const query = `
-INSERT INTO agents (name, region, continent, concurrency, status, last_seen_at, updated_at)
-VALUES ($1, $2, $3, $4, 'online', NOW(), NOW())
+INSERT INTO agents (name, region, continent, concurrency, status, last_seen_at, os, architecture, version, auth_mode, updated_at)
+VALUES ($1, $2, $3, $4, 'online', NOW(), $5, $6, $7, 'legacy', NOW())
 ON CONFLICT (name) DO UPDATE SET
     region = EXCLUDED.region,
     continent = EXCLUDED.continent,
     concurrency = EXCLUDED.concurrency,
+    os = EXCLUDED.os,
+    architecture = EXCLUDED.architecture,
+    version = EXCLUDED.version,
+    auth_mode = 'legacy',
     status = 'online',
     last_seen_at = NOW(),
     updated_at = NOW()
-RETURNING id::text, name, region, continent, concurrency, status, last_seen_at, created_at`
+WHERE agents.auth_mode = 'legacy'
+RETURNING id::text, name, region, continent, concurrency, status, os, architecture, version, auth_mode, last_seen_at, created_at`
 
 	var agent model.Agent
-	err := s.pool.QueryRow(ctx, query, input.Name, input.Region, input.Continent, input.Concurrency).Scan(
+	err := s.pool.QueryRow(ctx, query, input.Name, input.Region, input.Continent, input.Concurrency, input.OS, input.Architecture, input.Version).Scan(
 		&agent.ID, &agent.Name, &agent.Region, &agent.Continent, &agent.Concurrency,
-		&agent.Status, &agent.LastSeenAt, &agent.CreatedAt,
+		&agent.Status, &agent.OS, &agent.Architecture, &agent.Version, &agent.AuthMode, &agent.LastSeenAt, &agent.CreatedAt,
 	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Agent{}, store.ErrEnrollmentConflict
+	}
 	if err != nil {
 		return model.Agent{}, fmt.Errorf("register agent: %w", err)
 	}
@@ -89,7 +98,7 @@ func (s *Store) ListAgents(ctx context.Context) ([]model.Agent, error) {
 	rows, err := s.pool.Query(ctx, `
 SELECT id::text, name, region, continent, concurrency,
        CASE WHEN last_seen_at >= NOW() - INTERVAL '45 seconds' THEN 'online' ELSE 'offline' END,
-       last_seen_at, created_at
+       os, architecture, version, auth_mode, last_seen_at, created_at
 FROM agents ORDER BY continent, region, name`)
 	if err != nil {
 		return nil, fmt.Errorf("list agents: %w", err)
@@ -98,7 +107,7 @@ FROM agents ORDER BY continent, region, name`)
 	items := make([]model.Agent, 0)
 	for rows.Next() {
 		var item model.Agent
-		if err := rows.Scan(&item.ID, &item.Name, &item.Region, &item.Continent, &item.Concurrency, &item.Status, &item.LastSeenAt, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Region, &item.Continent, &item.Concurrency, &item.Status, &item.OS, &item.Architecture, &item.Version, &item.AuthMode, &item.LastSeenAt, &item.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan agent: %w", err)
 		}
 		items = append(items, item)

@@ -55,7 +55,7 @@ jobs:
           archive_file="release/cfscan-linux-${GOARCH}.tar.gz"
           mkdir -p "$archive_dir"
           go build -trimpath -ldflags='-s -w' -o "$archive_dir/cfscan-server" ./cmd/server
-          go build -trimpath -ldflags='-s -w' -o "$archive_dir/cfscan-agent" ./cmd/agent
+          go build -trimpath -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" -o "$archive_dir/cfscan-agent" ./cmd/agent
           cp LICENSE NOTICE CHANGELOG.md "$archive_dir/"
           tar -C release -czf "$archive_file" "cfscan-linux-${GOARCH}"
           (cd release && sha256sum "cfscan-linux-${GOARCH}.tar.gz" > "cfscan-linux-${GOARCH}.tar.gz.sha256")
@@ -111,6 +111,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: mode=max

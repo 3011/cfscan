@@ -36,10 +36,12 @@ Build and maintain a centralized Cloudflare IP scanning and ranking platform. Th
 ## Security and data rules
 
 - Never commit or print passwords, session cookies, Agent tokens, database DSNs, or production exports.
+- Active pairing UUIDs are short-lived secrets: never add them to logs, screenshots, fixtures, or error messages. Long-term Agent tokens must remain local; Center stores only hashes.
 - Backend authorization is mandatory; hiding frontend actions is not sufficient.
 - Parameterize SQL and bound external I/O with contexts/timeouts.
 - Do not mutate or delete production data for UI smoke tests.
 - Preserve stopped-job late-result behavior and Agent-scoped blacklist semantics.
+- Preserve legacy shared Agent token compatibility until an explicit migration release removes it; new Agents must use per-Agent credentials.
 
 ## Commands
 
@@ -86,3 +88,5 @@ Source changes and GitOps deployment are separate commits. Only update deploymen
 - Do not commit internal registries, private domains, local absolute paths, production Agent names, credentials, cookies, or unsanitized screenshots.
 - Public releases are SemVer Git tags created after CI passes on `main`.
 - Community, security, responsible-use, and third-party notice files are part of the release contract and must remain accurate.
+
+- Read `docs/agent-enrollment.md` before changing Agent authentication, enrollment, identity persistence, or CLI behavior.
