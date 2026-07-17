@@ -4,6 +4,13 @@ All notable public changes are documented here.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-07-17
+
+### Security
+
+- Enforced the 10,000-target sampling limit inside the target sampler itself.
+- Removed request-sized Slice and Map preallocations flagged by CodeQL while retaining existing API and query limits.
+
 ## [1.1.0] - 2026-07-17
 
 ### Added

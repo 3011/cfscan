@@ -1053,7 +1053,7 @@ func (s *Store) ListResults(ctx context.Context, filter model.ResultFilter) (mod
 
 	base, args := resultDataset(filter, true, true)
 	page := model.ResultPage{
-		Items:    make([]model.ScanResult, 0, filter.PageSize),
+		Items:    make([]model.ScanResult, 0),
 		Total:    total,
 		Page:     filter.Page,
 		PageSize: filter.PageSize,
@@ -1522,7 +1522,7 @@ FROM automation_runs ORDER BY started_at DESC LIMIT $1`, limit)
 		return nil, fmt.Errorf("list automation runs: %w", err)
 	}
 	defer rows.Close()
-	items := make([]model.AutomationRun, 0, limit)
+	items := make([]model.AutomationRun, 0)
 	for rows.Next() {
 		var item model.AutomationRun
 		var config, summary []byte

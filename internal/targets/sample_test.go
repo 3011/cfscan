@@ -29,3 +29,10 @@ func TestSampleDistributesAndStaysInsidePrefixes(t *testing.T) {
 		}
 	}
 }
+
+func TestSampleRejectsExcessiveLimit(t *testing.T) {
+	prefixes := []model.Prefix{{CIDR: "192.0.2.0/24", IPVersion: 4, Active: true}}
+	if _, err := Sample(prefixes, MaxSampleTargets+1, false, "test"); err == nil {
+		t.Fatal("expected excessive target limit to be rejected")
+	}
+}
