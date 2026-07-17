@@ -1,0 +1,11 @@
+.git
+.github
+.env
+*.local
+bin
+coverage.out
+docs/images
+web/node_modules
+web/dist
+web/*.tsbuildinfo
+.migration

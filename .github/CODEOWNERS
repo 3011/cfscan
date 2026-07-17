@@ -1,0 +1,6 @@
+* @3011
+/.github/ @3011
+/internal/auth/ @3011
+/internal/api/ @3011
+/internal/store/postgres/ @3011
+/web/src/components/ui/ @3011

@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+title: CF Scanner
+message: "If you use CF Scanner in research or operations documentation, please cite this repository and release."
+type: software
+authors:
+  - name: "3011"
+repository-code: "https://github.com/3011/cfscan"
+url: "https://github.com/3011/cfscan"
+license: Apache-2.0
+version: 1.0.0
+date-released: 2026-07-17

@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l cmd internal)"
+
+      - name: Check documentation
+        run: python3 scripts/check_docs.py
+
+      - name: Vet and test Go
+        run: |
+          go vet ./...
+          go test -race ./...
+          make build
+
+      - name: Install web dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Check web
+        working-directory: web
+        run: pnpm check
+
+      - name: Build container images
+        run: |
+          docker build -f Dockerfile.server -t cfscan-server:ci .
+          docker build -f Dockerfile.agent -t cfscan-agent:ci .
+          docker build -f web/Dockerfile -t cfscan-web:ci web

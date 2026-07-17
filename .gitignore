@@ -1,0 +1,16 @@
+.env
+*.local
+bin/
+dist/
+coverage.out
+web/node_modules/
+web/dist/
+.idea/
+.vscode/
+.DS_Store
+web/*.tsbuildinfo
+web/*.js
+web/*.d.ts
+
+# Temporary shadcn reference projects
+.migration/
