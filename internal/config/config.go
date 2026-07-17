@@ -14,6 +14,12 @@ type Server struct {
 	BootstrapAdminPassword string
 	SessionTTL             time.Duration
 	CookieSecure           bool
+	PublicWebURL           string
+	PublicAgentURL         string
+	AgentImage             string
+	AgentVersion           string
+	EnrollmentTTL          time.Duration
+	EnrollmentPollInterval time.Duration
 }
 
 type Agent struct {
@@ -31,18 +37,24 @@ func LoadServer() Server {
 	return Server{
 		HTTPAddr:               env("CFSCAN_HTTP_ADDR", ":8080"),
 		DatabaseURL:            env("CFSCAN_DATABASE_URL", "postgres://cfscan:cfscan@localhost:5432/cfscan?sslmode=disable"),
-		AgentToken:             env("CFSCAN_AGENT_TOKEN", "change-me"),
+		AgentToken:             env("CFSCAN_AGENT_TOKEN", ""),
 		BootstrapAdminUser:     env("CFSCAN_BOOTSTRAP_ADMIN_USERNAME", "admin"),
 		BootstrapAdminPassword: env("CFSCAN_BOOTSTRAP_ADMIN_PASSWORD", ""),
 		SessionTTL:             envDuration("CFSCAN_SESSION_TTL", 24*time.Hour),
 		CookieSecure:           envBool("CFSCAN_COOKIE_SECURE", true),
+		PublicWebURL:           env("CFSCAN_PUBLIC_WEB_URL", "http://localhost:18081"),
+		PublicAgentURL:         env("CFSCAN_PUBLIC_AGENT_URL", "http://localhost:18080"),
+		AgentImage:             env("CFSCAN_AGENT_IMAGE", "ghcr.io/3011/cfscan-agent:v1.1.0"),
+		AgentVersion:           env("CFSCAN_AGENT_VERSION", "v1.1.0"),
+		EnrollmentTTL:          envDuration("CFSCAN_AGENT_ENROLLMENT_TTL", 10*time.Minute),
+		EnrollmentPollInterval: envDuration("CFSCAN_AGENT_ENROLLMENT_POLL_INTERVAL", 3*time.Second),
 	}
 }
 
 func LoadAgent() Agent {
 	return Agent{
 		CenterURL:         env("CFSCAN_CENTER_URL", "http://localhost:8080"),
-		Token:             env("CFSCAN_AGENT_TOKEN", "change-me"),
+		Token:             env("CFSCAN_AGENT_TOKEN", ""),
 		Name:              env("CFSCAN_AGENT_NAME", "local-agent"),
 		Region:            env("CFSCAN_AGENT_REGION", "local"),
 		Continent:         env("CFSCAN_AGENT_CONTINENT", "local"),

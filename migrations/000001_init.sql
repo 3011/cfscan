@@ -278,3 +278,43 @@ CREATE INDEX IF NOT EXISTS idx_automation_runs_type ON automation_runs (automati
 UPDATE automation_runs SET status = 'failed', error = CASE WHEN error = '' THEN '中心服务在执行期间中断' ELSE error END,
     finished_at = COALESCE(finished_at, NOW())
 WHERE status = 'running' AND started_at < NOW() - INTERVAL '15 minutes';
+
+
+-- Agent enrollment and per-Agent credentials. Runtime migrations use internal/store/postgres/schema.sql.
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS os TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS architecture TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS version TEXT NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS auth_mode TEXT NOT NULL DEFAULT 'legacy';
+
+CREATE TABLE IF NOT EXISTS agent_enrollments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    token_hash TEXT NOT NULL UNIQUE,
+    mode TEXT NOT NULL CHECK (mode IN ('device', 'preauthorized')),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'claimed', 'rejected', 'revoked')),
+    requested_name TEXT NOT NULL DEFAULT '',
+    os TEXT NOT NULL DEFAULT '',
+    architecture TEXT NOT NULL DEFAULT '',
+    version TEXT NOT NULL DEFAULT '',
+    requested_concurrency INTEGER NOT NULL DEFAULT 1 CHECK (requested_concurrency > 0),
+    name TEXT NOT NULL DEFAULT '',
+    region TEXT NOT NULL DEFAULT '',
+    continent TEXT NOT NULL DEFAULT '',
+    concurrency INTEGER NOT NULL DEFAULT 1 CHECK (concurrency > 0),
+    agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    approved_at TIMESTAMPTZ,
+    claimed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_agent_enrollments_active ON agent_enrollments (status, expires_at DESC);
+
+CREATE TABLE IF NOT EXISTS agent_credentials (
+    id UUID PRIMARY KEY,
+    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    secret_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_agent_credentials_agent ON agent_credentials (agent_id, revoked_at);

@@ -2,6 +2,27 @@
 
 All notable public changes are documented here.
 
+## [Unreleased]
+
+## [1.1.0] - 2026-07-17
+
+### Added
+
+- Added browser-approved Agent pairing with short-lived UUID enrollment keys.
+- Added preauthorized one-time deployment commands for unattended installations.
+- Added per-Agent long-term credentials, atomic local identity persistence, and `connect` / `join` CLI commands.
+- Added pending enrollment management and approval UI for desktop and mobile layouts.
+
+### Security
+
+- Center stores only hashes of pairing keys and long-term Agent secrets.
+- Per-Agent credentials bind heartbeat, task claim, and result upload requests to the authenticated Agent identity.
+- New Agent enrollment requires HTTPS except for loopback development or an explicit insecure override.
+
+### Compatibility
+
+- Existing shared-token Agents remain supported during migration and are marked as legacy authentication in the UI.
+
 ## [1.0.0] - 2026-07-17
 
 ### Security

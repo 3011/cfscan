@@ -6,21 +6,140 @@ import (
 )
 
 type Agent struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Region      string    `json:"region"`
-	Continent   string    `json:"continent"`
-	Concurrency int       `json:"concurrency"`
-	Status      string    `json:"status"`
-	LastSeenAt  time.Time `json:"last_seen_at"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Region       string    `json:"region"`
+	Continent    string    `json:"continent"`
+	Concurrency  int       `json:"concurrency"`
+	Status       string    `json:"status"`
+	OS           string    `json:"os"`
+	Architecture string    `json:"architecture"`
+	Version      string    `json:"version"`
+	AuthMode     string    `json:"auth_mode"`
+	LastSeenAt   time.Time `json:"last_seen_at"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type AgentRegistration struct {
+	Name         string `json:"name"`
+	Region       string `json:"region"`
+	Continent    string `json:"continent"`
+	Concurrency  int    `json:"concurrency"`
+	OS           string `json:"os,omitempty"`
+	Architecture string `json:"architecture,omitempty"`
+	Version      string `json:"version,omitempty"`
+}
+
+const (
+	AgentEnrollmentModeDevice        = "device"
+	AgentEnrollmentModePreauthorized = "preauthorized"
+
+	AgentEnrollmentPending  = "pending"
+	AgentEnrollmentApproved = "approved"
+	AgentEnrollmentClaimed  = "claimed"
+	AgentEnrollmentRejected = "rejected"
+	AgentEnrollmentRevoked  = "revoked"
+	AgentEnrollmentExpired  = "expired"
+)
+
+type AgentEnrollment struct {
+	ID                   string     `json:"id"`
+	Mode                 string     `json:"mode"`
+	Status               string     `json:"status"`
+	RequestedName        string     `json:"requested_name"`
+	OS                   string     `json:"os"`
+	Architecture         string     `json:"architecture"`
+	Version              string     `json:"version"`
+	RequestedConcurrency int        `json:"requested_concurrency"`
+	Name                 string     `json:"name,omitempty"`
+	Region               string     `json:"region,omitempty"`
+	Continent            string     `json:"continent,omitempty"`
+	Concurrency          int        `json:"concurrency,omitempty"`
+	AgentID              string     `json:"agent_id,omitempty"`
+	ExpiresAt            time.Time  `json:"expires_at"`
+	ApprovedAt           *time.Time `json:"approved_at,omitempty"`
+	ClaimedAt            *time.Time `json:"claimed_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+}
+
+type CreateAgentEnrollment struct {
+	TokenHash            string
+	Mode                 string
+	Status               string
+	RequestedName        string
+	OS                   string
+	Architecture         string
+	Version              string
+	RequestedConcurrency int
+	Name                 string
+	Region               string
+	Continent            string
+	Concurrency          int
+	ExpiresAt            time.Time
+}
+
+type CreateDeviceEnrollmentRequest struct {
+	Name         string `json:"name"`
+	OS           string `json:"os"`
+	Architecture string `json:"architecture"`
+	Version      string `json:"version"`
+	Concurrency  int    `json:"concurrency"`
+}
+
+type CreateDeviceEnrollmentResponse struct {
+	PairingToken            string `json:"pairing_token"`
+	VerificationURI         string `json:"verification_uri"`
+	VerificationURIComplete string `json:"verification_uri_complete"`
+	ExpiresIn               int    `json:"expires_in"`
+	Interval                int    `json:"interval"`
+}
+
+type ApproveAgentEnrollmentRequest struct {
 	Name        string `json:"name"`
 	Region      string `json:"region"`
 	Continent   string `json:"continent"`
 	Concurrency int    `json:"concurrency"`
+}
+
+type CreatePreauthorizedEnrollmentRequest struct {
+	Name        string `json:"name"`
+	Region      string `json:"region"`
+	Continent   string `json:"continent"`
+	Concurrency int    `json:"concurrency"`
+	TTLMinutes  int    `json:"ttl_minutes"`
+}
+
+type CreatePreauthorizedEnrollmentResponse struct {
+	Enrollment   AgentEnrollment `json:"enrollment"`
+	PairingToken string          `json:"pairing_token"`
+	ExpiresIn    int             `json:"expires_in"`
+}
+
+type ClaimAgentEnrollmentRequest struct {
+	PairingToken     string `json:"pairing_token"`
+	CredentialID     string `json:"credential_id"`
+	CredentialSecret string `json:"credential_secret"`
+	OS               string `json:"os,omitempty"`
+	Architecture     string `json:"architecture,omitempty"`
+	Version          string `json:"version,omitempty"`
+}
+
+type ClaimAgentEnrollmentResponse struct {
+	Status      string `json:"status"`
+	AgentID     string `json:"agent_id,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Concurrency int    `json:"concurrency,omitempty"`
+	Interval    int    `json:"interval,omitempty"`
+}
+
+type AgentEnrollmentConfig struct {
+	PublicWebURL   string `json:"public_web_url"`
+	PublicAgentURL string `json:"public_agent_url"`
+	AgentImage     string `json:"agent_image"`
+	AgentVersion   string `json:"agent_version"`
+	TTLSeconds     int    `json:"ttl_seconds"`
+	PollInterval   int    `json:"poll_interval"`
 }
 
 type AgentHeartbeat struct {

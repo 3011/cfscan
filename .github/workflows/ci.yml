@@ -62,5 +62,12 @@ jobs:
       - name: Build container images
         run: |
           docker build -f Dockerfile.server -t cfscan-server:ci .
-          docker build -f Dockerfile.agent -t cfscan-agent:ci .
+          docker build --build-arg VERSION=ci -f Dockerfile.agent -t cfscan-agent:ci .
           docker build -f web/Dockerfile -t cfscan-web:ci web
+
+      - name: Test Agent enrollment
+        env:
+          CFSCAN_ENROLLMENT_SERVER_IMAGE: cfscan-server:ci
+          CFSCAN_ENROLLMENT_AGENT_IMAGE: cfscan-agent:ci
+          CFSCAN_ENROLLMENT_SKIP_BUILD: '1'
+        run: make test-enrollment

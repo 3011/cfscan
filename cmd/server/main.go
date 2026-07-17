@@ -15,6 +15,7 @@ import (
 	"github.com/3011/cfscan/internal/automation"
 	"github.com/3011/cfscan/internal/cloudflare"
 	"github.com/3011/cfscan/internal/config"
+	"github.com/3011/cfscan/internal/model"
 	"github.com/3011/cfscan/internal/scans"
 	"github.com/3011/cfscan/internal/scheduling"
 	"github.com/3011/cfscan/internal/store/postgres"
@@ -42,8 +43,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	enrollmentConfig := model.AgentEnrollmentConfig{
+		PublicWebURL: cfg.PublicWebURL, PublicAgentURL: cfg.PublicAgentURL,
+		AgentImage: cfg.AgentImage, AgentVersion: cfg.AgentVersion,
+		TTLSeconds: int(cfg.EnrollmentTTL.Seconds()), PollInterval: max(int(cfg.EnrollmentPollInterval.Seconds()), 1),
+	}
 	server := &http.Server{
-		Addr: cfg.HTTPAddr, Handler: api.New(dataStore, syncer, automationService, authService, cfg.AgentToken, logger),
+		Addr: cfg.HTTPAddr, Handler: api.New(dataStore, syncer, automationService, authService, cfg.AgentToken, enrollmentConfig, logger),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second,
 		WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second,
 	}

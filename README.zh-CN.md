@@ -40,6 +40,7 @@ React + shadcn/ui 管理台
 - 黑名单复查的执行频率、候选范围、选择比例、单轮上限、探测阈值和再次等待时间均可配置；
 - React 19 + TypeScript 6 + Tailwind CSS 4 + shadcn/ui Rhea 管理端；
 - 应用内账号登录、HttpOnly 会话和管理员 / 查看者两级权限；
+- Agent 支持“终端生成配对 URL → Web 批准”和预授权自动化部署；配对后使用独立长期凭据；
 - Agent 最后心跳使用共享秒级时钟实时更新，不依赖列表轮询刷新；
 - PostgreSQL 任务租约和幂等结果回传；运行中任务支持“停止剩余任务”，晚到结果不会产生黑名单副作用；
 - 自动化中心统一管理扫描计划、黑名单复查、数据源同步和带配置快照的执行记录。
@@ -141,27 +142,42 @@ make check
 
 ```bash
 CFSCAN_DATABASE_URL='postgres://cfscan:password@127.0.0.1:5432/cfscan?sslmode=disable' \
-CFSCAN_AGENT_TOKEN='replace-me' \
+CFSCAN_PUBLIC_WEB_URL='https://cfscan.example.com' \
+CFSCAN_PUBLIC_AGENT_URL='https://cfscan-agent.example.com' \
+CFSCAN_AGENT_IMAGE='ghcr.io/3011/cfscan-agent:v1.1.0' \
+CFSCAN_AGENT_VERSION='v1.1.0' \
 CFSCAN_BOOTSTRAP_ADMIN_USERNAME='admin' \
 CFSCAN_BOOTSTRAP_ADMIN_PASSWORD='replace-with-a-strong-password' \
 CFSCAN_SESSION_TTL='24h' \
-CFSCAN_COOKIE_SECURE='false' \
+CFSCAN_COOKIE_SECURE='true' \
 ./bin/cfscan-server
 ```
 
 `CFSCAN_BOOTSTRAP_ADMIN_*` 只在账号表为空时创建首个管理员；已有账号后不会覆盖密码。生产 HTTPS 环境应保持 `CFSCAN_COOKIE_SECURE=true`。
 
+新安装无需配置共享 Agent Token。迁移旧 Agent 时再显式设置 `CFSCAN_AGENT_TOKEN`，并在所有节点完成独立配对后移除。
+
 ## 运行 Agent
 
+推荐方式是在目标机器运行一条不包含秘密的命令：
+
 ```bash
-CFSCAN_CENTER_URL='https://cfscan-agent.example.com' \
-CFSCAN_AGENT_TOKEN='replace-me' \
-CFSCAN_AGENT_NAME='hk-01' \
-CFSCAN_AGENT_REGION='hong-kong' \
-CFSCAN_AGENT_CONTINENT='asia' \
-CFSCAN_AGENT_CONCURRENCY='64' \
-./bin/cfscan-agent
+./bin/cfscan-agent connect --server https://cfscan-agent.example.com
 ```
+
+Agent 会显示一次性 UUID 配对 URL。管理员在浏览器中登录、确认名称和地区并批准后，Agent 自动保存独立身份并开始心跳、领取任务和上传结果。
+
+无人值守部署在“Agent 节点 → 添加 Agent → 自动化部署”中预生成一次性命令：
+
+```bash
+./bin/cfscan-agent join \
+  --server https://cfscan-agent.example.com \
+  --token <one-time-uuid>
+```
+
+自动化环境可使用 `--token-file` 或 `--token-stdin`，避免一次性密钥进入 Shell history。完整状态、Docker 示例、HTTPS 规则和旧共享 Token迁移见 [`docs/agent-enrollment.md`](docs/agent-enrollment.md)。
+
+旧 Agent 在迁移期间仍可继续使用原有共享 Token 和名称、地区环境变量，但新部署不再推荐这种方式。
 
 ## IP 数据源
 

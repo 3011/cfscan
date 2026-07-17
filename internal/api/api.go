@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 	authservice "github.com/3011/cfscan/internal/auth"
 	"github.com/3011/cfscan/internal/automation"
 	"github.com/3011/cfscan/internal/cloudflare"
+	"github.com/3011/cfscan/internal/enrollment"
 	"github.com/3011/cfscan/internal/model"
 	"github.com/3011/cfscan/internal/scans"
 	"github.com/3011/cfscan/internal/scheduling"
@@ -24,23 +26,32 @@ import (
 )
 
 type API struct {
-	store        store.Store
-	syncer       *cloudflare.Syncer
-	agentToken   string
-	logger       *slog.Logger
-	scanService  *scans.Service
-	automation   *automation.Service
-	auth         *authservice.Service
-	loginLimiter *authservice.LoginLimiter
+	store             store.Store
+	syncer            *cloudflare.Syncer
+	agentToken        string
+	logger            *slog.Logger
+	scanService       *scans.Service
+	automation        *automation.Service
+	auth              *authservice.Service
+	loginLimiter      *authservice.LoginLimiter
+	enrollmentLimiter *enrollment.RateLimiter
+	enrollmentConfig  model.AgentEnrollmentConfig
 }
 
-func New(dataStore store.Store, syncer *cloudflare.Syncer, automationService *automation.Service, authService *authservice.Service, agentToken string, logger *slog.Logger) http.Handler {
-	api := &API{store: dataStore, syncer: syncer, automation: automationService, auth: authService, loginLimiter: authservice.NewLoginLimiter(), agentToken: agentToken, logger: logger, scanService: scans.NewService(dataStore, syncer)}
+func New(dataStore store.Store, syncer *cloudflare.Syncer, automationService *automation.Service, authService *authservice.Service, agentToken string, enrollmentConfig model.AgentEnrollmentConfig, logger *slog.Logger) http.Handler {
+	api := &API{
+		store: dataStore, syncer: syncer, automation: automationService, auth: authService,
+		loginLimiter: authservice.NewLoginLimiter(), enrollmentLimiter: enrollment.NewRateLimiter(12, time.Minute),
+		agentToken: agentToken, enrollmentConfig: enrollmentConfig, logger: logger,
+		scanService: scans.NewService(dataStore, syncer),
+	}
 	router := chi.NewRouter()
 	router.Use(api.serverTime, middleware.RequestID, middleware.RealIP, middleware.Recoverer, api.accessLog)
 	router.Get("/healthz", api.health)
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", api.login)
+		r.Post("/agent/enrollments", api.createDeviceEnrollment)
+		r.Post("/agent/enrollments/claim", api.claimAgentEnrollment)
 
 		r.Route("/agent", func(r chi.Router) {
 			r.Use(api.requireAgentToken)
@@ -57,6 +68,10 @@ func New(dataStore store.Store, syncer *cloudflare.Syncer, automationService *au
 
 			r.Get("/overview", api.overview)
 			r.Get("/agents", api.listAgents)
+			r.Get("/agent-enrollments/config", api.agentEnrollmentConfig)
+			r.Get("/agent-enrollments", api.listAgentEnrollments)
+			r.Get("/agent-enrollments/id/{enrollmentID}", api.getAgentEnrollmentByID)
+			r.Get("/agent-enrollments/{pairingToken}", api.getAgentEnrollment)
 			r.Get("/sources/cloudflare", api.sourceStatus)
 			r.Get("/sources/asns", api.listASNSources)
 			r.Get("/jobs", api.listJobs)
@@ -71,6 +86,11 @@ func New(dataStore store.Store, syncer *cloudflare.Syncer, automationService *au
 			r.Get("/automation/source-syncs", api.listSourceSyncSchedules)
 			r.Get("/automation/runs", api.listAutomationRuns)
 
+			r.With(api.requireAdmin).Post("/agent-enrollments/preauthorized", api.createPreauthorizedEnrollment)
+			r.With(api.requireAdmin).Post("/agent-enrollments/id/{enrollmentID}/approve", api.approveAgentEnrollmentByID)
+			r.With(api.requireAdmin).Post("/agent-enrollments/id/{enrollmentID}/reject", api.rejectAgentEnrollmentByID)
+			r.With(api.requireAdmin).Post("/agent-enrollments/{pairingToken}/approve", api.approveAgentEnrollment)
+			r.With(api.requireAdmin).Post("/agent-enrollments/{pairingToken}/reject", api.rejectAgentEnrollment)
 			r.With(api.requireAdmin).Post("/sources/cloudflare/sync", api.syncSource)
 			r.With(api.requireAdmin).Post("/sources/asns", api.createASNSource)
 			r.With(api.requireAdmin).Post("/sources/asns/sync", api.syncASNSources)
@@ -666,17 +686,29 @@ func (a *API) listAutomationRuns(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) registerAgent(w http.ResponseWriter, r *http.Request) {
+	if currentAgentID(r.Context()) != "" {
+		writeError(w, http.StatusForbidden, "legacy_registration_only", "independent Agent credentials cannot register another Agent")
+		return
+	}
 	var input model.AgentRegistration
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 	input.Name, input.Region, input.Continent = strings.TrimSpace(input.Name), strings.TrimSpace(input.Region), strings.TrimSpace(input.Continent)
-	if input.Name == "" || input.Region == "" || input.Continent == "" || input.Concurrency <= 0 {
-		writeError(w, http.StatusBadRequest, "invalid_request", "name, region, continent and positive concurrency are required")
+	input.OS, input.Architecture, input.Version = strings.TrimSpace(input.OS), strings.TrimSpace(input.Architecture), strings.TrimSpace(input.Version)
+	if !validApprovedAgent(input.Name, input.Region, input.Continent, input.Concurrency) ||
+		!textLengthBetween(input.OS, 0, maxAgentLabelLength) ||
+		!textLengthBetween(input.Architecture, 0, maxAgentLabelLength) ||
+		!textLengthBetween(input.Version, 0, maxAgentLabelLength) {
+		writeError(w, http.StatusBadRequest, "invalid_request", "Agent metadata or concurrency is invalid")
 		return
 	}
 	agent, err := a.store.RegisterAgent(r.Context(), input)
+	if errors.Is(err, store.ErrEnrollmentConflict) {
+		writeError(w, http.StatusConflict, "agent_name_conflict", "an independently paired Agent already uses this name")
+		return
+	}
 	if err != nil {
 		a.internalError(w, r, err)
 		return
@@ -690,8 +722,14 @@ func (a *API) heartbeat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
+	if agentID := currentAgentID(r.Context()); agentID != "" {
+		input.AgentID = agentID
+	}
 	if strings.TrimSpace(input.AgentID) == "" {
 		writeError(w, http.StatusBadRequest, "invalid_request", "agent_id is required")
+		return
+	}
+	if !a.authorizeLegacyAgent(w, r, input.AgentID) {
 		return
 	}
 	if err := a.store.Heartbeat(r.Context(), input.AgentID); err != nil {
@@ -707,8 +745,14 @@ func (a *API) claimTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
+	if agentID := currentAgentID(r.Context()); agentID != "" {
+		input.AgentID = agentID
+	}
 	if strings.TrimSpace(input.AgentID) == "" {
 		writeError(w, http.StatusBadRequest, "invalid_request", "agent_id is required")
+		return
+	}
+	if !a.authorizeLegacyAgent(w, r, input.AgentID) {
 		return
 	}
 	batch, err := a.store.ClaimTasks(r.Context(), input.AgentID, input.Limit)
@@ -729,8 +773,14 @@ func (a *API) submitResults(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
+	if agentID := currentAgentID(r.Context()); agentID != "" {
+		input.AgentID = agentID
+	}
 	if input.AgentID == "" || input.JobID == "" || len(input.Results) == 0 {
 		writeError(w, http.StatusBadRequest, "invalid_request", "agent_id, job_id and results are required")
+		return
+	}
+	if !a.authorizeLegacyAgent(w, r, input.AgentID) {
 		return
 	}
 	if err := a.store.SubmitResults(r.Context(), input); err != nil {
@@ -743,12 +793,62 @@ func (a *API) submitResults(w http.ResponseWriter, r *http.Request) {
 func (a *API) requireAgentToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(a.agentToken)) != 1 {
+		if provided == "" {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "invalid agent token")
 			return
 		}
-		next.ServeHTTP(w, r)
+		if a.agentToken != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(a.agentToken)) == 1 {
+			ctx := context.WithValue(r.Context(), currentAgentAuthModeKey{}, "legacy")
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		credentialID, secret, err := enrollment.ParseAgentToken(provided)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "invalid agent token")
+			return
+		}
+		agentID, err := a.store.AuthenticateAgentCredential(r.Context(), credentialID, enrollment.HashSecret(secret))
+		if errors.Is(err, store.ErrInvalidAgentCredential) {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "invalid agent token")
+			return
+		}
+		if err != nil {
+			a.internalError(w, r, err)
+			return
+		}
+		ctx := context.WithValue(r.Context(), currentAgentKey{}, agentID)
+		ctx = context.WithValue(ctx, currentAgentAuthModeKey{}, "token")
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+type currentAgentKey struct{}
+type currentAgentAuthModeKey struct{}
+
+func currentAgentID(ctx context.Context) string {
+	value, _ := ctx.Value(currentAgentKey{}).(string)
+	return value
+}
+
+func currentAgentAuthMode(ctx context.Context) string {
+	value, _ := ctx.Value(currentAgentAuthModeKey{}).(string)
+	return value
+}
+
+func (a *API) authorizeLegacyAgent(w http.ResponseWriter, r *http.Request, agentID string) bool {
+	if currentAgentAuthMode(r.Context()) != "legacy" {
+		return true
+	}
+	err := a.store.AuthorizeLegacyAgent(r.Context(), agentID)
+	if errors.Is(err, store.ErrInvalidAgentCredential) {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "legacy token cannot access this Agent")
+		return false
+	}
+	if err != nil {
+		a.internalError(w, r, err)
+		return false
+	}
+	return true
 }
 
 func (a *API) serverTime(next http.Handler) http.Handler {
@@ -758,16 +858,32 @@ func (a *API) serverTime(next http.Handler) http.Handler {
 	})
 }
 
+func safeLogPath(path string) string {
+	const prefix = "/api/v1/agent-enrollments/"
+	if !strings.HasPrefix(path, prefix) {
+		return path
+	}
+	rest := strings.TrimPrefix(path, prefix)
+	first, suffix, _ := strings.Cut(rest, "/")
+	if enrollment.LooksLikeUUID(first) {
+		if suffix == "" {
+			return prefix + "{pairingToken}"
+		}
+		return prefix + "{pairingToken}/" + suffix
+	}
+	return path
+}
+
 func (a *API) accessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		next.ServeHTTP(w, r)
-		a.logger.Info("http request", "method", r.Method, "path", r.URL.Path, "duration", time.Since(started))
+		a.logger.Info("http request", "method", r.Method, "path", safeLogPath(r.URL.Path), "duration", time.Since(started))
 	})
 }
 
 func (a *API) internalError(w http.ResponseWriter, r *http.Request, err error) {
-	a.logger.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
+	a.logger.Error("request failed", "method", r.Method, "path", safeLogPath(r.URL.Path), "error", err)
 	writeError(w, http.StatusInternalServerError, "internal_error", "request failed")
 }
 

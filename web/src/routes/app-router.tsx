@@ -10,6 +10,7 @@ const ScansPage = lazy(() => import('@/features/scans/scans-page').then((module)
 const ResultsPage = lazy(() => import('@/features/results/results-page').then((module) => ({ default: module.ResultsPage })))
 const BlacklistPage = lazy(() => import('@/features/blacklist/blacklist-page').then((module) => ({ default: module.BlacklistPage })))
 const AgentsPage = lazy(() => import('@/features/agents/agents-page').then((module) => ({ default: module.AgentsPage })))
+const EnrollmentApprovalPage = lazy(() => import('@/features/agents/enrollment-approval-page').then((module) => ({ default: module.EnrollmentApprovalPage })))
 const SettingsPage = lazy(() => import('@/features/settings/settings-page').then((module) => ({ default: module.SettingsPage })))
 const LoginPage = lazy(() => import('@/features/auth/login-page').then((module) => ({ default: module.LoginPage })))
 const UsersPage = lazy(() => import('@/features/users/users-page').then((module) => ({ default: module.UsersPage })))
@@ -22,6 +23,8 @@ export function AppRouter() {
           <Route path="login" element={<LoginPage />} />
         </Route>
         <Route element={<ProtectedRoute />}>
+          <Route path="agents/pair/:pairingToken" element={<EnrollmentApprovalPage />} />
+          <Route path="agents/enrollments/:enrollmentID" element={<EnrollmentApprovalPage />} />
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
             <Route path="sources" element={<SourcesPage />} />

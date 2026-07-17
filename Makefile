@@ -3,7 +3,7 @@ PNPM ?= pnpm
 REGISTRY ?= ghcr.io/3011
 VERSION ?= dev
 
-.PHONY: fmt docs-check test build build-web check-web check images push compose-up compose-down
+.PHONY: fmt docs-check test test-enrollment build build-web check-web check images push compose-up compose-down
 
 fmt:
 	$(GO)fmt -w cmd internal
@@ -11,7 +11,7 @@ fmt:
 build:
 	mkdir -p bin
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags="-s -w" -o bin/cfscan-server ./cmd/server
-	CGO_ENABLED=0 $(GO) build -trimpath -ldflags="-s -w" -o bin/cfscan-agent ./cmd/agent
+	CGO_ENABLED=0 $(GO) build -trimpath -ldflags="-s -w -X main.version=$(VERSION)" -o bin/cfscan-agent ./cmd/agent
 
 build-web:
 	cd web && $(PNPM) build
@@ -24,6 +24,9 @@ check-web:
 
 test:
 	$(GO) test ./...
+
+test-enrollment:
+	./scripts/test-agent-enrollment.sh
 
 check: docs-check test build check-web
 
