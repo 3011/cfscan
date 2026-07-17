@@ -82,8 +82,8 @@ func Validate(input model.CreateScanJobRequest) error {
 	if input.SamplingMode != SamplingModeCount && input.SamplingMode != SamplingModeOnePerPrefix {
 		return fmt.Errorf("sampling_mode must be count or one_per_prefix")
 	}
-	if input.SamplingMode == SamplingModeCount && (input.TargetCount < 1 || input.TargetCount > 10000) {
-		return fmt.Errorf("target_count must be between 1 and 10000")
+	if input.SamplingMode == SamplingModeCount && (input.TargetCount < 1 || input.TargetCount > targets.MaxSampleTargets) {
+		return fmt.Errorf("target_count must be between 1 and %d", targets.MaxSampleTargets)
 	}
 	if input.Scheme != "https" && input.Scheme != "http" {
 		return fmt.Errorf("scheme must be http or https")

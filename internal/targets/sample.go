@@ -10,9 +10,11 @@ import (
 	"github.com/3011/cfscan/internal/model"
 )
 
+const MaxSampleTargets = 10000
+
 func Sample(prefixes []model.Prefix, limit int, includeIPv6 bool, seed string) ([]string, error) {
-	if limit <= 0 {
-		return nil, fmt.Errorf("target limit must be positive")
+	if limit <= 0 || limit > MaxSampleTargets {
+		return nil, fmt.Errorf("target limit must be between 1 and %d", MaxSampleTargets)
 	}
 	usable := make([]netip.Prefix, 0, len(prefixes))
 	for _, item := range prefixes {
@@ -30,8 +32,8 @@ func Sample(prefixes []model.Prefix, limit int, includeIPv6 bool, seed string) (
 	}
 	sort.Slice(usable, func(i, j int) bool { return usable[i].String() < usable[j].String() })
 
-	result := make([]string, 0, limit)
-	seen := make(map[string]struct{}, limit)
+	result := make([]string, 0)
+	seen := make(map[string]struct{})
 	for round := 0; len(result) < limit && round < limit*4; round++ {
 		for _, prefix := range usable {
 			if len(result) >= limit {
