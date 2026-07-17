@@ -58,7 +58,7 @@ jobs:
           go build -trimpath -ldflags='-s -w' -o "$archive_dir/cfscan-agent" ./cmd/agent
           cp LICENSE NOTICE CHANGELOG.md "$archive_dir/"
           tar -C release -czf "$archive_file" "cfscan-linux-${GOARCH}"
-          sha256sum "$archive_file" > "${archive_file}.sha256"
+          (cd release && sha256sum "cfscan-linux-${GOARCH}.tar.gz" > "cfscan-linux-${GOARCH}.tar.gz.sha256")
       - uses: actions/upload-artifact@v7
         with:
           name: binaries-${{ matrix.goarch }}
