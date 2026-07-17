@@ -43,12 +43,12 @@ docker run -d --name "$postgres" --network "$network" \
   "$postgres_image" >/dev/null
 
 for _ in $(seq 1 40); do
-  if docker exec "$postgres" pg_isready -U cfscan -d cfscan >/dev/null 2>&1; then
+  if docker exec "$postgres" pg_isready -h 127.0.0.1 -U cfscan -d cfscan >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
-docker exec "$postgres" pg_isready -U cfscan -d cfscan >/dev/null
+docker exec "$postgres" pg_isready -h 127.0.0.1 -U cfscan -d cfscan >/dev/null
 
 docker run -d --name "$server" --network "$network" \
   -e CFSCAN_HTTP_ADDR=:8080 \
@@ -60,6 +60,23 @@ docker run -d --name "$server" --network "$network" \
   -e CFSCAN_PUBLIC_WEB_URL=http://web.example.test \
   -e "CFSCAN_PUBLIC_AGENT_URL=http://${server}:8080" \
   "$server_image" >/dev/null
+
+for _ in $(seq 1 60); do
+  if [ "$(docker inspect -f '{{.State.Running}}' "$server" 2>/dev/null || true)" != "true" ]; then
+    echo "Center exited before becoming healthy" >&2
+    docker logs "$server" --tail 120 >&2 || true
+    exit 1
+  fi
+  if docker exec "$server" wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+if ! docker exec "$server" wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1; then
+  echo "Center did not become healthy" >&2
+  docker logs "$server" --tail 120 >&2 || true
+  exit 1
+fi
 
 client_log="$(mktemp)"
 set +e
