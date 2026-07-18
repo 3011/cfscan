@@ -15,19 +15,8 @@ type Agent struct {
 	OS           string    `json:"os"`
 	Architecture string    `json:"architecture"`
 	Version      string    `json:"version"`
-	AuthMode     string    `json:"auth_mode"`
 	LastSeenAt   time.Time `json:"last_seen_at"`
 	CreatedAt    time.Time `json:"created_at"`
-}
-
-type AgentRegistration struct {
-	Name         string `json:"name"`
-	Region       string `json:"region"`
-	Continent    string `json:"continent"`
-	Concurrency  int    `json:"concurrency"`
-	OS           string `json:"os,omitempty"`
-	Architecture string `json:"architecture,omitempty"`
-	Version      string `json:"version,omitempty"`
 }
 
 const (
@@ -134,16 +123,11 @@ type ClaimAgentEnrollmentResponse struct {
 }
 
 type AgentEnrollmentConfig struct {
-	PublicWebURL   string `json:"public_web_url"`
-	PublicAgentURL string `json:"public_agent_url"`
-	AgentImage     string `json:"agent_image"`
-	AgentVersion   string `json:"agent_version"`
-	TTLSeconds     int    `json:"ttl_seconds"`
-	PollInterval   int    `json:"poll_interval"`
-}
-
-type AgentHeartbeat struct {
-	AgentID string `json:"agent_id"`
+	PublicURL    string `json:"public_url"`
+	AgentImage   string `json:"agent_image"`
+	AgentVersion string `json:"agent_version"`
+	TTLSeconds   int    `json:"ttl_seconds"`
+	PollInterval int    `json:"poll_interval"`
 }
 
 type Overview struct {
@@ -258,8 +242,7 @@ type ScanJob struct {
 }
 
 type TaskClaimRequest struct {
-	AgentID string `json:"agent_id"`
-	Limit   int    `json:"limit"`
+	Limit int `json:"limit"`
 }
 
 type ScanTask struct {
@@ -301,7 +284,7 @@ type ProbeResult struct {
 }
 
 type ResultBatch struct {
-	AgentID string        `json:"agent_id"`
+	AgentID string        `json:"-"`
 	JobID   string        `json:"job_id"`
 	Results []ProbeResult `json:"results"`
 }

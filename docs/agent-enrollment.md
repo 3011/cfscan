@@ -1,6 +1,6 @@
 # Agent 配对与身份
 
-CF Scanner 新 Agent 默认通过一次性配对流程加入 Center。每个完成配对的 Agent 都拥有独立长期凭据；旧共享 Token 仅用于平滑迁移。
+CF Scanner Agent 通过一次性配对流程加入 Center。每个 Agent 都拥有独立长期凭据，不存在共享 Token 接入方式。
 
 ## 身份模型
 
@@ -29,7 +29,7 @@ HTTPS Bearer 鉴权
 在 Agent 机器运行：
 
 ```bash
-cfscan-agent connect --server https://agent.example.com
+cfscan-agent connect --server https://cfscan.example.com
 ```
 
 Agent 输出配对 URL并等待：
@@ -37,7 +37,7 @@ Agent 输出配对 URL并等待：
 ```text
 Waiting for administrator approval
 
-Open: https://console.example.com/agents/pair/<one-time-uuid>
+Open: https://cfscan.example.com/agents/pair/<one-time-uuid>
 Pairing key: <one-time-uuid>
 Expires in: 10m0s
 
@@ -65,7 +65,7 @@ Docker:  建议 /var/lib/cfscan-agent/identity.json
 同一个 `connect` 命令重启时会优先读取现有身份，不会生成新的配对请求。只配对、不进入运行循环时使用：
 
 ```bash
-cfscan-agent connect --server https://agent.example.com --pair-only
+cfscan-agent connect --server https://cfscan.example.com --pair-only
 ```
 
 ## 预授权方式：自动化部署
@@ -74,7 +74,7 @@ cfscan-agent connect --server https://agent.example.com --pair-only
 
 ```bash
 cfscan-agent join \
-  --server https://agent.example.com \
+  --server https://cfscan.example.com \
   --token 8b8f3bf4-5ea2-49e0-b07e-087f69973223
 ```
 
@@ -84,7 +84,7 @@ cfscan-agent join \
 
 ```bash
 cfscan-agent join \
-  --server https://agent.example.com \
+  --server https://cfscan.example.com \
   --token-file /run/secrets/cfscan-enrollment-token
 ```
 
@@ -92,7 +92,7 @@ cfscan-agent join \
 
 ```bash
 printf '%s' "$CFSCAN_ENROLLMENT_TOKEN" |
-  cfscan-agent join --server https://agent.example.com --token-stdin
+  cfscan-agent join --server https://cfscan.example.com --token-stdin
 ```
 
 避免把一次性密钥写入长期 Shell history、CI 日志或 Kubernetes Pod spec。
@@ -107,8 +107,8 @@ docker run -d \
   --restart unless-stopped \
   -e CFSCAN_AGENT_IDENTITY_FILE=/var/lib/cfscan-agent/identity.json \
   -v cfscan-agent-data:/var/lib/cfscan-agent \
-  ghcr.io/3011/cfscan-agent:v1.1.0 \
-  connect --server https://agent.example.com
+  ghcr.io/3011/cfscan-agent:v2.0.0 \
+  connect --server https://cfscan.example.com
 ```
 
 查看配对 URL：
@@ -150,26 +150,11 @@ http://[::1]
 
 配对请求和 Agent 运行状态相互独立。只有成功领取后才会创建正式 Agent，因此预授权但从未部署不会产生离线占位节点。
 
-## 旧共享 Token 迁移
+## 已删除的旧接入方式
 
-现有 Agent 可以继续使用：
+从 v2.0.0 开始，Center 不再读取 `CFSCAN_AGENT_TOKEN`，Agent 不再读取共享 Token、地区或大洲注册环境变量，`POST /api/v1/agent/register` 也已删除。
 
-```text
-CFSCAN_AGENT_TOKEN
-CFSCAN_AGENT_NAME
-CFSCAN_AGENT_REGION
-CFSCAN_AGENT_CONTINENT
-```
-
-此模式会在管理台显示“旧共享鉴权”。推荐迁移顺序：
-
-1. 先升级 Center，使其同时支持两种鉴权；
-2. 在每个节点停止旧 Agent；
-3. 使用 `connect` 重新配对；
-4. 确认新 Agent 在线且 `auth_mode=token`；
-5. 全部迁移完成后更换或关闭旧共享 Token。
-
-不要先关闭共享 Token再升级旧 Agent，否则旧节点会立即失联。
+升级前必须先确保每个节点已经拥有独立 `identity.json`。升级后，没有独立身份的旧 Agent 会停止工作，必须重新执行 `connect` 或 `join`。
 
 ## API 边界
 

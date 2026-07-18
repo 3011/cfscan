@@ -52,7 +52,7 @@ export function AddAgentSheet() {
     defaultValues: { name: '', region: '', continent: 'Asia', concurrency: 64, ttl_minutes: 30 },
   })
 
-  const agentURL = config.data?.public_agent_url || window.location.origin
+  const agentURL = config.data?.public_url || window.location.origin
   const image = config.data?.agent_image || 'ghcr.io/3011/cfscan-agent:latest'
   const deviceCommands = useMemo(() => ({
     binary: `cfscan-agent connect --server ${agentURL}`,

@@ -64,7 +64,7 @@ func (a *API) createDeviceEnrollment(w http.ResponseWriter, r *http.Request) {
 		a.internalError(w, r, err)
 		return
 	}
-	verificationURI := strings.TrimRight(a.enrollmentConfig.PublicWebURL, "/") + "/agents/pair"
+	verificationURI := strings.TrimRight(a.enrollmentConfig.PublicURL, "/") + "/agents/pair"
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusCreated, model.CreateDeviceEnrollmentResponse{
 		PairingToken: pairingToken, VerificationURI: verificationURI,

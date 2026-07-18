@@ -11,7 +11,6 @@ agent_image="${CFSCAN_ENROLLMENT_AGENT_IMAGE:-cfscan-agent:enrollment-test}"
 python_image="${CFSCAN_ENROLLMENT_PYTHON_IMAGE:-python:3-alpine}"
 postgres_image="${CFSCAN_ENROLLMENT_POSTGRES_IMAGE:-postgres:17-alpine}"
 database_password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
-legacy_token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 admin_password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
 
 cleanup() {
@@ -53,12 +52,10 @@ docker exec "$postgres" pg_isready -h 127.0.0.1 -U cfscan -d cfscan >/dev/null
 docker run -d --name "$server" --network "$network" \
   -e CFSCAN_HTTP_ADDR=:8080 \
   -e "CFSCAN_DATABASE_URL=postgres://cfscan:${database_password}@${postgres}:5432/cfscan?sslmode=disable" \
-  -e "CFSCAN_AGENT_TOKEN=$legacy_token" \
   -e CFSCAN_BOOTSTRAP_ADMIN_USERNAME=admin \
   -e "CFSCAN_BOOTSTRAP_ADMIN_PASSWORD=$admin_password" \
   -e CFSCAN_COOKIE_SECURE=false \
-  -e CFSCAN_PUBLIC_WEB_URL=http://web.example.test \
-  -e "CFSCAN_PUBLIC_AGENT_URL=http://${server}:8080" \
+  -e CFSCAN_PUBLIC_URL=http://public.example.test \
   "$server_image" >/dev/null
 
 for _ in $(seq 1 60); do
@@ -83,7 +80,6 @@ set +e
 docker run --rm -i --network "$network" \
   -e "CFSCAN_TEST_SERVER=http://${server}:8080" \
   -e "CFSCAN_TEST_ADMIN_PASSWORD=$admin_password" \
-  -e "CFSCAN_TEST_LEGACY_TOKEN=$legacy_token" \
   "$python_image" python - >"$client_log" 2>&1 <<'PY'
 import http.cookiejar
 import json
@@ -96,7 +92,6 @@ import uuid
 
 BASE = os.environ["CFSCAN_TEST_SERVER"]
 ADMIN_PASSWORD = os.environ["CFSCAN_TEST_ADMIN_PASSWORD"]
-LEGACY_TOKEN = os.environ["CFSCAN_TEST_LEGACY_TOKEN"]
 
 
 def request(path, data=None, headers=None, opener=None, expected=None):
@@ -134,6 +129,9 @@ else:
 cookies = http.cookiejar.CookieJar()
 admin = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
 request("/api/v1/auth/login", {"username": "admin", "password": ADMIN_PASSWORD}, opener=admin, expected=200)
+_, config = request("/api/v1/agent-enrollments/config", opener=admin, expected=200)
+assert config["public_url"] == "http://public.example.test"
+assert "public_web_url" not in config and "public_agent_url" not in config
 
 _, device = request(
     "/api/v1/agent/enrollments",
@@ -142,7 +140,7 @@ _, device = request(
 )
 pairing_token = device["pairing_token"]
 assert len(pairing_token) == 36
-assert device["verification_uri_complete"] == f"http://web.example.test/agents/pair/{pairing_token}"
+assert device["verification_uri_complete"] == f"http://public.example.test/agents/pair/{pairing_token}"
 
 _, pending = request("/api/v1/agent-enrollments", opener=admin, expected=200)
 assert len(pending["items"]) == 1
@@ -176,43 +174,47 @@ assert retry["agent_id"] == agent_id
 agent_token = f"cfa_{credential_id}_{credential_secret}"
 request(
     "/api/v1/agent/heartbeat",
-    {"agent_id": "00000000-0000-0000-0000-000000000000"},
+    {},
     {"Authorization": f"Bearer {agent_token}"},
     expected=204,
 )
-_, agents = request("/api/v1/agents", opener=admin, expected=200)
-agent = next(item for item in agents["items"] if item["id"] == agent_id)
-assert agent["auth_mode"] == "token"
-assert agent["name"] == "worker-test-01"
-assert agent["os"] == "linux"
-
-# The legacy shared token cannot impersonate or overwrite an independently paired Agent.
 request(
     "/api/v1/agent/heartbeat",
     {"agent_id": agent_id},
-    {"Authorization": f"Bearer {LEGACY_TOKEN}"},
-    expected=401,
+    {"Authorization": f"Bearer {agent_token}"},
+    expected=400,
 )
-request(
-    "/api/v1/agent/register",
-    {"name": "worker-test-01", "region": "Legacy", "continent": "Asia", "concurrency": 8},
-    {"Authorization": f"Bearer {LEGACY_TOKEN}"},
-    expected=409,
-)
+_, agents = request("/api/v1/agents", opener=admin, expected=200)
+agent = next(item for item in agents["items"] if item["id"] == agent_id)
+assert "auth_mode" not in agent
+assert agent["name"] == "worker-test-01"
+assert agent["os"] == "linux"
 
-_, legacy = request(
-    "/api/v1/agent/register",
-    {"name": "legacy-test-01", "region": "Legacy", "continent": "Asia", "concurrency": 8},
-    {"Authorization": f"Bearer {LEGACY_TOKEN}"},
-    expected=200,
-)
-assert legacy["auth_mode"] == "legacy"
+# Shared-token authentication and the old registration endpoint were removed in v2.
 request(
     "/api/v1/agent/heartbeat",
-    {"agent_id": legacy["id"]},
-    {"Authorization": f"Bearer {LEGACY_TOKEN}"},
-    expected=204,
+    {},
+    {"Authorization": "Bearer removed-shared-token"},
+    expected=401,
 )
+
+def raw_status(path, data, headers):
+    req = urllib.request.Request(
+        BASE + path,
+        data=json.dumps(data).encode(),
+        headers={"Accept": "application/json", "Content-Type": "application/json", **headers},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+assert raw_status(
+    "/api/v1/agent/register",
+    {"name": "removed-registration"},
+    {"Authorization": f"Bearer {agent_token}"},
+) == 404
 
 _, preauthorized = request(
     "/api/v1/agent-enrollments/preauthorized",

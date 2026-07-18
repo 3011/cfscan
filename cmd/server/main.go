@@ -44,12 +44,12 @@ func main() {
 	}
 
 	enrollmentConfig := model.AgentEnrollmentConfig{
-		PublicWebURL: cfg.PublicWebURL, PublicAgentURL: cfg.PublicAgentURL,
+		PublicURL:  cfg.PublicURL,
 		AgentImage: cfg.AgentImage, AgentVersion: cfg.AgentVersion,
 		TTLSeconds: int(cfg.EnrollmentTTL.Seconds()), PollInterval: max(int(cfg.EnrollmentPollInterval.Seconds()), 1),
 	}
 	server := &http.Server{
-		Addr: cfg.HTTPAddr, Handler: api.New(dataStore, syncer, automationService, authService, cfg.AgentToken, enrollmentConfig, logger),
+		Addr: cfg.HTTPAddr, Handler: api.New(dataStore, syncer, automationService, authService, enrollmentConfig, logger),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second,
 		WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second,
 	}

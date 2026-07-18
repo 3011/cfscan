@@ -4,6 +4,20 @@ All notable public changes are documented here.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-18
+
+### Changed
+
+- Unified the Web console, management API, and Agent API behind one public origin configured by `CFSCAN_PUBLIC_URL`.
+- Agent `run` now requires a saved independent identity; `connect` and `join` are the only enrollment paths.
+
+### Removed
+
+- Removed shared Agent token authentication and the `CFSCAN_AGENT_TOKEN` setting.
+- Removed `POST /api/v1/agent/register` and the legacy Agent registration environment variables.
+- Removed the `auth_mode` API/database field and legacy authentication labels from the Web console.
+- Removed the split `CFSCAN_PUBLIC_WEB_URL` and `CFSCAN_PUBLIC_AGENT_URL` settings.
+
 ## [1.1.1] - 2026-07-17
 
 ### Security

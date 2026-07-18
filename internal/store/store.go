@@ -20,7 +20,6 @@ type Store interface {
 	ResetUserPassword(context.Context, string, string) error
 	DeleteUser(context.Context, string) error
 
-	RegisterAgent(context.Context, model.AgentRegistration) (model.Agent, error)
 	CreateAgentEnrollment(context.Context, model.CreateAgentEnrollment) (model.AgentEnrollment, error)
 	GetAgentEnrollment(context.Context, string) (model.AgentEnrollment, error)
 	GetAgentEnrollmentByID(context.Context, string) (model.AgentEnrollment, error)
@@ -31,7 +30,6 @@ type Store interface {
 	RejectAgentEnrollmentByID(context.Context, string) (model.AgentEnrollment, error)
 	ClaimAgentEnrollment(context.Context, string, string, string, string, string, string) (model.AgentEnrollment, error)
 	AuthenticateAgentCredential(context.Context, string, string) (string, error)
-	AuthorizeLegacyAgent(context.Context, string) error
 	Heartbeat(context.Context, string) error
 	ListAgents(context.Context) ([]model.Agent, error)
 	Overview(context.Context) (model.Overview, error)

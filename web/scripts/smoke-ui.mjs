@@ -18,7 +18,7 @@ function mockEnrollment() {
     requested_name: 'smoke-agent',
     os: 'linux',
     architecture: 'amd64',
-    version: 'v1.1.0-smoke',
+    version: 'v2.0.0-smoke',
     requested_concurrency: 32,
     name: mockEnrollmentStatus === 'pending' ? '' : 'smoke-agent',
     region: mockEnrollmentStatus === 'pending' ? '' : 'Smoke Region',
@@ -43,10 +43,9 @@ async function installEnrollmentMocks(page) {
 
     if (method === 'GET' && path === '/api/v1/agent-enrollments/config') {
       return fulfill(200, {
-        public_web_url: baseURL,
-        public_agent_url: 'https://agent.example.test',
-        agent_image: 'ghcr.io/3011/cfscan-agent:v1.1.0',
-        agent_version: 'v1.1.0',
+        public_url: baseURL,
+        agent_image: 'ghcr.io/3011/cfscan-agent:v2.0.0',
+        agent_version: 'v2.0.0',
         ttl_seconds: 600,
         poll_interval: 3,
       })
@@ -355,13 +354,13 @@ try {
     await page.getByRole('button', { name: '添加 Agent' }).click()
     const agentSheet = page.locator('[data-slot=sheet-content]')
     await agentSheet.waitFor()
-    const deviceCommandVisible = (await agentSheet.innerText()).includes('cfscan-agent connect --server https://agent.example.test')
+    const deviceCommandVisible = (await agentSheet.innerText()).includes(`cfscan-agent connect --server ${baseURL}`)
     await agentSheet.getByRole('radio', { name: /自动化部署/ }).click()
     await agentSheet.getByLabel('节点名称').fill('automated-smoke-agent')
     await agentSheet.getByLabel('地区').fill('Smoke Region')
     await agentSheet.getByRole('button', { name: '生成部署命令' }).click()
     await agentSheet.getByText('一次性部署命令已生成', { exact: true }).waitFor()
-    const generatedCommandVisible = (await agentSheet.innerText()).includes('cfscan-agent join --server https://agent.example.test --token')
+    const generatedCommandVisible = (await agentSheet.innerText()).includes(`cfscan-agent join --server ${baseURL} --token`)
     report.interactions.agentEnrollmentSheet = deviceCommandVisible && generatedCommandVisible
     await agentSheet.getByRole('button', { name: '关闭' }).click()
 

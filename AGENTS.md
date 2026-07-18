@@ -41,7 +41,7 @@ Build and maintain a centralized Cloudflare IP scanning and ranking platform. Th
 - Parameterize SQL and bound external I/O with contexts/timeouts.
 - Do not mutate or delete production data for UI smoke tests.
 - Preserve stopped-job late-result behavior and Agent-scoped blacklist semantics.
-- Preserve legacy shared Agent token compatibility until an explicit migration release removes it; new Agents must use per-Agent credentials.
+- Agent authentication only supports independently enrolled per-Agent credentials; do not reintroduce shared tokens or the removed registration endpoint.
 
 ## Commands
 

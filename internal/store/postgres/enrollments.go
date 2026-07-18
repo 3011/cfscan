@@ -166,12 +166,12 @@ WHERE id=$1::uuid AND secret_hash=$2 AND revoked_at IS NULL`, credentialID, cred
 	}
 	var agent model.Agent
 	err = tx.QueryRow(ctx, `INSERT INTO agents (
-name, region, continent, concurrency, status, last_seen_at, os, architecture, version, auth_mode, updated_at
-) VALUES ($1,$2,$3,$4,'online',NOW(),$5,$6,$7,'token',NOW())
-RETURNING id::text, name, region, continent, concurrency, status, os, architecture, version, auth_mode, last_seen_at, created_at`,
+name, region, continent, concurrency, status, last_seen_at, os, architecture, version, updated_at
+) VALUES ($1,$2,$3,$4,'online',NOW(),$5,$6,$7,NOW())
+RETURNING id::text, name, region, continent, concurrency, status, os, architecture, version, last_seen_at, created_at`,
 		item.Name, item.Region, item.Continent, item.Concurrency, item.OS, item.Architecture, item.Version,
 	).Scan(&agent.ID, &agent.Name, &agent.Region, &agent.Continent, &agent.Concurrency,
-		&agent.Status, &agent.OS, &agent.Architecture, &agent.Version, &agent.AuthMode,
+		&agent.Status, &agent.OS, &agent.Architecture, &agent.Version,
 		&agent.LastSeenAt, &agent.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -272,17 +272,4 @@ RETURNING ` + enrollmentColumns
 		return model.AgentEnrollment{}, fmt.Errorf("reject agent enrollment by id: %w", err)
 	}
 	return item, nil
-}
-
-func (s *Store) AuthorizeLegacyAgent(ctx context.Context, agentID string) error {
-	var allowed bool
-	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(
-SELECT 1 FROM agents WHERE id=$1::uuid AND auth_mode='legacy'
-)`, agentID).Scan(&allowed); err != nil {
-		return fmt.Errorf("authorize legacy Agent: %w", err)
-	}
-	if !allowed {
-		return store.ErrInvalidAgentCredential
-	}
-	return nil
 }

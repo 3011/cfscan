@@ -38,8 +38,8 @@ docker compose logs -f local-agent
 
 ```text
 Web:    http://localhost:18081
-API:    http://localhost:18080
-Health: http://localhost:18080/healthz
+API:    http://localhost:18081/api/*
+Health: http://localhost:18081/healthz
 ```
 
 登录账号由 `.env` 中的 `CFSCAN_BOOTSTRAP_ADMIN_USERNAME` 和 `CFSCAN_BOOTSTRAP_ADMIN_PASSWORD` 决定。Compose 中的默认值只用于本机开发，不能复制到生产。
@@ -70,7 +70,7 @@ make build
 ./bin/cfscan-server
 ```
 
-`.env.example` 的数据库地址使用宿主机端口 `55432`，Center 监听宿主机端口 `18080`，与 Vite 代理一致。如果使用本机 PostgreSQL或其他端口，请自行调整。
+分离开发时，`.env.example` 的数据库地址使用宿主机端口 `55432`，Center 单独监听 `18080`，与 Vite 开发代理一致。Compose 模式则只公开 Web 的 `18081`，由 Nginx 将 `/api` 和 `/healthz` 转发到内部 Center。
 
 ### 启动 Web
 
@@ -88,7 +88,7 @@ pnpm dev -- --port 4173
 ./bin/cfscan-agent connect --server http://127.0.0.1:18080
 ```
 
-本地 loopback HTTP允许使用。打开终端显示的 URL，在管理台批准后 Agent 会保存身份并继续运行。再次执行同一命令会复用身份。自动化模式和旧共享 Token迁移见 [`agent-enrollment.md`](agent-enrollment.md)。
+本地 loopback HTTP允许使用。打开终端显示的 URL，在管理台批准后 Agent 会保存身份并继续运行。再次执行同一命令会复用身份。自动化模式见 [`agent-enrollment.md`](agent-enrollment.md)。
 
 ## 目录结构
 
