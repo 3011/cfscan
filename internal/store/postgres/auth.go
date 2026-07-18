@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/3011/cfscan/internal/model"
+	"github.com/3011/cfscan/v2/internal/model"
 )
 
 func (s *Store) EnsureBootstrapAdmin(ctx context.Context, username, displayName, passwordHash string) error {

@@ -10,15 +10,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/3011/cfscan/internal/api"
-	authservice "github.com/3011/cfscan/internal/auth"
-	"github.com/3011/cfscan/internal/automation"
-	"github.com/3011/cfscan/internal/cloudflare"
-	"github.com/3011/cfscan/internal/config"
-	"github.com/3011/cfscan/internal/model"
-	"github.com/3011/cfscan/internal/scans"
-	"github.com/3011/cfscan/internal/scheduling"
-	"github.com/3011/cfscan/internal/store/postgres"
+	"github.com/3011/cfscan/v2/internal/api"
+	authservice "github.com/3011/cfscan/v2/internal/auth"
+	"github.com/3011/cfscan/v2/internal/automation"
+	"github.com/3011/cfscan/v2/internal/cloudflare"
+	"github.com/3011/cfscan/v2/internal/config"
+	"github.com/3011/cfscan/v2/internal/model"
+	"github.com/3011/cfscan/v2/internal/scans"
+	"github.com/3011/cfscan/v2/internal/scheduling"
+	"github.com/3011/cfscan/v2/internal/store/postgres"
 )
 
 func main() {

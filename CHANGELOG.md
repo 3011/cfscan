@@ -9,6 +9,7 @@ All notable public changes are documented here.
 ### Changed
 
 - Unified the Web console, management API, and Agent API behind one public origin configured by `CFSCAN_PUBLIC_URL`.
+- Updated the Go module path to `github.com/3011/cfscan/v2` for semantic import versioning.
 - Agent `run` now requires a saved independent identity; `connect` and `join` are the only enrollment paths.
 
 ### Removed

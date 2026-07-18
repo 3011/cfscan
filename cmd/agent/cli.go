@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/3011/cfscan/internal/config"
-	"github.com/3011/cfscan/internal/enrollment"
-	"github.com/3011/cfscan/internal/model"
+	"github.com/3011/cfscan/v2/internal/config"
+	"github.com/3011/cfscan/v2/internal/enrollment"
+	"github.com/3011/cfscan/v2/internal/model"
 )
 
 type enrollmentOptions struct {

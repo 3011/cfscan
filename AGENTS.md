@@ -84,7 +84,7 @@ Source changes and GitOps deployment are separate commits. Only update deploymen
 
 ## Public repository rules
 
-- The public module path is `github.com/3011/cfscan` and release images use `ghcr.io/3011/cfscan-*`.
+- The public module path is `github.com/3011/cfscan/v2` and release images use `ghcr.io/3011/cfscan-*`.
 - Do not commit internal registries, private domains, local absolute paths, production Agent names, credentials, cookies, or unsanitized screenshots.
 - Public releases are SemVer Git tags created after CI passes on `main`.
 - Community, security, responsible-use, and third-party notice files are part of the release contract and must remain accurate.

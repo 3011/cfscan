@@ -52,8 +52,8 @@ for path in PUBLIC_REQUIRED:
 if (ROOT / "deploy" / "ca-certificates.crt").exists():
     errors.append("generated CA bundle must not be committed; install ca-certificates in the runtime image")
 
-if (ROOT / "go.mod").read_text(encoding="utf-8").splitlines()[0] != "module github.com/3011/cfscan":
-    errors.append("go.mod must use public module path github.com/3011/cfscan")
+if (ROOT / "go.mod").read_text(encoding="utf-8").splitlines()[0] != "module github.com/3011/cfscan/v2":
+    errors.append("go.mod must use public module path github.com/3011/cfscan/v2")
 
 if "REGISTRY ?= ghcr.io/3011" not in (ROOT / "Makefile").read_text(encoding="utf-8"):
     errors.append("Makefile must default to the public ghcr.io/3011 registry")

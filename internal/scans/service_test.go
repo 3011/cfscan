@@ -3,7 +3,7 @@ package scans
 import (
 	"testing"
 
-	"github.com/3011/cfscan/internal/model"
+	"github.com/3011/cfscan/v2/internal/model"
 )
 
 func TestApplyDefaultsAndValidate(t *testing.T) {

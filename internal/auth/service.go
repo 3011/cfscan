@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/3011/cfscan/internal/model"
-	"github.com/3011/cfscan/internal/store"
+	"github.com/3011/cfscan/v2/internal/model"
+	"github.com/3011/cfscan/v2/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
 

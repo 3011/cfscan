@@ -8,9 +8,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/3011/cfscan/internal/enrollment"
-	"github.com/3011/cfscan/internal/model"
-	"github.com/3011/cfscan/internal/store"
+	"github.com/3011/cfscan/v2/internal/enrollment"
+	"github.com/3011/cfscan/v2/internal/model"
+	"github.com/3011/cfscan/v2/internal/store"
 	"github.com/go-chi/chi/v5"
 )
 

@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/3011/cfscan/internal/cloudflare"
-	"github.com/3011/cfscan/internal/model"
-	"github.com/3011/cfscan/internal/scheduling"
+	"github.com/3011/cfscan/v2/internal/cloudflare"
+	"github.com/3011/cfscan/v2/internal/model"
+	"github.com/3011/cfscan/v2/internal/scheduling"
 )
 
 type Store interface {
