@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,11 +37,11 @@ type API struct {
 	enrollmentConfig  model.AgentEnrollmentConfig
 }
 
-func New(dataStore store.Store, syncer *cloudflare.Syncer, automationService *automation.Service, authService *authservice.Service, agentToken string, enrollmentConfig model.AgentEnrollmentConfig, logger *slog.Logger) http.Handler {
+func New(dataStore store.Store, syncer *cloudflare.Syncer, automationService *automation.Service, authService *authservice.Service, enrollmentConfig model.AgentEnrollmentConfig, logger *slog.Logger) http.Handler {
 	api := &API{
 		store: dataStore, syncer: syncer, automation: automationService, auth: authService,
 		loginLimiter: authservice.NewLoginLimiter(), enrollmentLimiter: enrollment.NewRateLimiter(12, time.Minute),
-		agentToken: agentToken, enrollmentConfig: enrollmentConfig, logger: logger,
+		enrollmentConfig: enrollmentConfig, logger: logger,
 		scanService: scans.NewService(dataStore, syncer),
 	}
 	router := chi.NewRouter()
@@ -55,7 +54,6 @@ func New(dataStore store.Store, syncer *cloudflare.Syncer, automationService *au
 
 		r.Route("/agent", func(r chi.Router) {
 			r.Use(api.requireAgentToken)
-			r.Post("/register", api.registerAgent)
 			r.Post("/heartbeat", api.heartbeat)
 			r.Post("/tasks/claim", api.claimTask)
 			r.Post("/tasks/results", api.submitResults)
@@ -685,54 +683,14 @@ func (a *API) listAutomationRuns(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (a *API) registerAgent(w http.ResponseWriter, r *http.Request) {
-	if currentAgentID(r.Context()) != "" {
-		writeError(w, http.StatusForbidden, "legacy_registration_only", "independent Agent credentials cannot register another Agent")
-		return
-	}
-	var input model.AgentRegistration
-	if err := decodeJSON(r, &input); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
-		return
-	}
-	input.Name, input.Region, input.Continent = strings.TrimSpace(input.Name), strings.TrimSpace(input.Region), strings.TrimSpace(input.Continent)
-	input.OS, input.Architecture, input.Version = strings.TrimSpace(input.OS), strings.TrimSpace(input.Architecture), strings.TrimSpace(input.Version)
-	if !validApprovedAgent(input.Name, input.Region, input.Continent, input.Concurrency) ||
-		!textLengthBetween(input.OS, 0, maxAgentLabelLength) ||
-		!textLengthBetween(input.Architecture, 0, maxAgentLabelLength) ||
-		!textLengthBetween(input.Version, 0, maxAgentLabelLength) {
-		writeError(w, http.StatusBadRequest, "invalid_request", "Agent metadata or concurrency is invalid")
-		return
-	}
-	agent, err := a.store.RegisterAgent(r.Context(), input)
-	if errors.Is(err, store.ErrEnrollmentConflict) {
-		writeError(w, http.StatusConflict, "agent_name_conflict", "an independently paired Agent already uses this name")
-		return
-	}
-	if err != nil {
-		a.internalError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, agent)
-}
-
 func (a *API) heartbeat(w http.ResponseWriter, r *http.Request) {
-	var input model.AgentHeartbeat
+	var input struct{}
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	if agentID := currentAgentID(r.Context()); agentID != "" {
-		input.AgentID = agentID
-	}
-	if strings.TrimSpace(input.AgentID) == "" {
-		writeError(w, http.StatusBadRequest, "invalid_request", "agent_id is required")
-		return
-	}
-	if !a.authorizeLegacyAgent(w, r, input.AgentID) {
-		return
-	}
-	if err := a.store.Heartbeat(r.Context(), input.AgentID); err != nil {
+	agentID := currentAgentID(r.Context())
+	if err := a.store.Heartbeat(r.Context(), agentID); err != nil {
 		writeError(w, http.StatusNotFound, "agent_not_found", err.Error())
 		return
 	}
@@ -745,17 +703,8 @@ func (a *API) claimTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	if agentID := currentAgentID(r.Context()); agentID != "" {
-		input.AgentID = agentID
-	}
-	if strings.TrimSpace(input.AgentID) == "" {
-		writeError(w, http.StatusBadRequest, "invalid_request", "agent_id is required")
-		return
-	}
-	if !a.authorizeLegacyAgent(w, r, input.AgentID) {
-		return
-	}
-	batch, err := a.store.ClaimTasks(r.Context(), input.AgentID, input.Limit)
+	agentID := currentAgentID(r.Context())
+	batch, err := a.store.ClaimTasks(r.Context(), agentID, input.Limit)
 	if err != nil {
 		a.internalError(w, r, err)
 		return
@@ -773,14 +722,9 @@ func (a *API) submitResults(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	if agentID := currentAgentID(r.Context()); agentID != "" {
-		input.AgentID = agentID
-	}
-	if input.AgentID == "" || input.JobID == "" || len(input.Results) == 0 {
-		writeError(w, http.StatusBadRequest, "invalid_request", "agent_id, job_id and results are required")
-		return
-	}
-	if !a.authorizeLegacyAgent(w, r, input.AgentID) {
+	input.AgentID = currentAgentID(r.Context())
+	if input.JobID == "" || len(input.Results) == 0 {
+		writeError(w, http.StatusBadRequest, "invalid_request", "job_id and results are required")
 		return
 	}
 	if err := a.store.SubmitResults(r.Context(), input); err != nil {
@@ -795,11 +739,6 @@ func (a *API) requireAgentToken(next http.Handler) http.Handler {
 		provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if provided == "" {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "invalid agent token")
-			return
-		}
-		if a.agentToken != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(a.agentToken)) == 1 {
-			ctx := context.WithValue(r.Context(), currentAgentAuthModeKey{}, "legacy")
-			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 		credentialID, secret, err := enrollment.ParseAgentToken(provided)
@@ -817,38 +756,15 @@ func (a *API) requireAgentToken(next http.Handler) http.Handler {
 			return
 		}
 		ctx := context.WithValue(r.Context(), currentAgentKey{}, agentID)
-		ctx = context.WithValue(ctx, currentAgentAuthModeKey{}, "token")
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 type currentAgentKey struct{}
-type currentAgentAuthModeKey struct{}
 
 func currentAgentID(ctx context.Context) string {
 	value, _ := ctx.Value(currentAgentKey{}).(string)
 	return value
-}
-
-func currentAgentAuthMode(ctx context.Context) string {
-	value, _ := ctx.Value(currentAgentAuthModeKey{}).(string)
-	return value
-}
-
-func (a *API) authorizeLegacyAgent(w http.ResponseWriter, r *http.Request, agentID string) bool {
-	if currentAgentAuthMode(r.Context()) != "legacy" {
-		return true
-	}
-	err := a.store.AuthorizeLegacyAgent(r.Context(), agentID)
-	if errors.Is(err, store.ErrInvalidAgentCredential) {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "legacy token cannot access this Agent")
-		return false
-	}
-	if err != nil {
-		a.internalError(w, r, err)
-		return false
-	}
-	return true
 }
 
 func (a *API) serverTime(next http.Handler) http.Handler {

@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -54,56 +53,47 @@ func main() {
 	}
 }
 
-func runLegacyOrIdentity(ctx context.Context, logger *slog.Logger) error {
-	cfg := config.LoadAgent()
+func runSavedIdentity(ctx context.Context, logger *slog.Logger) error {
 	identityPath := defaultIdentityPath()
-	if identity, err := loadIdentity(identityPath); err == nil {
-		return runAgentLoop(ctx, &client{baseURL: identity.ServerURL, token: identity.Token, http: defaultHTTPClient()}, identity.AgentID, identity.Concurrency, logger)
-	} else if !errors.Is(err, os.ErrNotExist) {
+	identity, err := loadIdentity(identityPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("Agent identity not found at %s; run connect or join first", identityPath)
+	}
+	if err != nil {
 		return fmt.Errorf("load Agent identity: %w", err)
 	}
-
-	apiClient := &client{baseURL: strings.TrimRight(cfg.CenterURL, "/"), token: cfg.Token, http: defaultHTTPClient()}
-	agent, err := apiClient.register(ctx, model.AgentRegistration{
-		Name: cfg.Name, Region: cfg.Region, Continent: cfg.Continent, Concurrency: cfg.Concurrency,
-		OS: runtime.GOOS, Architecture: runtime.GOARCH, Version: agentVersion(),
-	})
-	if err != nil {
-		return fmt.Errorf("register legacy Agent: %w", err)
-	}
-	logger.Info("legacy Agent registered", "agent_id", agent.ID, "name", agent.Name, "region", agent.Region)
-	return runAgentLoop(ctx, apiClient, agent.ID, cfg.Concurrency, logger)
+	return runAgentLoop(ctx, &client{baseURL: identity.ServerURL, token: identity.Token, http: defaultHTTPClient()}, identity.Concurrency, logger)
 }
 
-func runAgentLoop(ctx context.Context, apiClient *client, agentID string, concurrency int, logger *slog.Logger) error {
+func runAgentLoop(ctx context.Context, apiClient *client, concurrency int, logger *slog.Logger) error {
 	cfg := config.LoadAgent()
 	heartbeatTicker := time.NewTicker(cfg.HeartbeatInterval)
 	pollTicker := time.NewTicker(cfg.PollInterval)
 	defer heartbeatTicker.Stop()
 	defer pollTicker.Stop()
 
-	if err := apiClient.heartbeat(ctx, agentID); err != nil {
+	if err := apiClient.heartbeat(ctx); err != nil {
 		logger.Warn("initial heartbeat failed", "error", err)
 	}
-	processAvailable(ctx, apiClient, agentID, concurrency, logger)
+	processAvailable(ctx, apiClient, concurrency, logger)
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("agent stopped")
 			return nil
 		case <-heartbeatTicker.C:
-			if err := apiClient.heartbeat(ctx, agentID); err != nil {
+			if err := apiClient.heartbeat(ctx); err != nil {
 				logger.Warn("heartbeat failed", "error", err)
 			}
 		case <-pollTicker.C:
-			processAvailable(ctx, apiClient, agentID, concurrency, logger)
+			processAvailable(ctx, apiClient, concurrency, logger)
 		}
 	}
 }
 
-func processAvailable(ctx context.Context, apiClient *client, agentID string, concurrency int, logger *slog.Logger) {
+func processAvailable(ctx context.Context, apiClient *client, concurrency int, logger *slog.Logger) {
 	for {
-		batch, err := apiClient.claim(ctx, agentID, concurrency)
+		batch, err := apiClient.claim(ctx, concurrency)
 		if err != nil {
 			logger.Warn("claim task failed", "error", err)
 			return
@@ -113,7 +103,7 @@ func processAvailable(ctx context.Context, apiClient *client, agentID string, co
 		}
 		logger.Info("scan batch claimed", "job_id", batch.JobID, "job", batch.JobName, "targets", len(batch.Tasks))
 		results := runBatch(ctx, *batch, concurrency)
-		if err := apiClient.submit(ctx, model.ResultBatch{AgentID: agentID, JobID: batch.JobID, Results: results}); err != nil {
+		if err := apiClient.submit(ctx, model.ResultBatch{JobID: batch.JobID, Results: results}); err != nil {
 			logger.Warn("submit scan results failed", "job_id", batch.JobID, "error", err)
 			return
 		}
@@ -166,20 +156,8 @@ func runBatch(ctx context.Context, batch model.TaskBatch, concurrency int) []mod
 	return items
 }
 
-func (c *client) register(ctx context.Context, input model.AgentRegistration) (model.Agent, error) {
-	var result model.Agent
-	status, err := c.postJSON(ctx, "/api/v1/agent/register", input, &result)
-	if err != nil {
-		return model.Agent{}, err
-	}
-	if status != http.StatusOK {
-		return model.Agent{}, fmt.Errorf("unexpected register status %d", status)
-	}
-	return result, nil
-}
-
-func (c *client) heartbeat(ctx context.Context, agentID string) error {
-	status, err := c.postJSON(ctx, "/api/v1/agent/heartbeat", model.AgentHeartbeat{AgentID: agentID}, nil)
+func (c *client) heartbeat(ctx context.Context) error {
+	status, err := c.postJSON(ctx, "/api/v1/agent/heartbeat", struct{}{}, nil)
 	if err != nil {
 		return err
 	}
@@ -189,9 +167,9 @@ func (c *client) heartbeat(ctx context.Context, agentID string) error {
 	return nil
 }
 
-func (c *client) claim(ctx context.Context, agentID string, limit int) (*model.TaskBatch, error) {
+func (c *client) claim(ctx context.Context, limit int) (*model.TaskBatch, error) {
 	var result model.TaskBatch
-	status, err := c.postJSON(ctx, "/api/v1/agent/tasks/claim", model.TaskClaimRequest{AgentID: agentID, Limit: limit}, &result)
+	status, err := c.postJSON(ctx, "/api/v1/agent/tasks/claim", model.TaskClaimRequest{Limit: limit}, &result)
 	if err != nil {
 		return nil, err
 	}

@@ -40,6 +40,7 @@ docker compose up -d --build
 ```
 
 Open `http://localhost:18081` and sign in with the bootstrap administrator configured in `.env`.
+The Web console, management API, and Agent API share this single public origin.
 
 Start the optional local Agent, then open the pairing URL printed in its logs:
 
@@ -53,12 +54,12 @@ Approve the request in the Web console. The Agent saves a per-Agent identity in 
 ## Architecture
 
 ```text
-React management console
-          │
-       Go Center ─── PostgreSQL
-          │ HTTPS JSON; Agents initiate every connection
-   ┌──────┼────────┐
- Asia Agent   Europe Agent   North America Agent
+Single HTTPS origin / Ingress
+  ├── /api/* → Go Center ─── PostgreSQL
+  └── /*     → React management console
+                    ▲
+       per-Agent HTTPS Bearer connections
+   Asia Agent   Europe Agent   North America Agent
 ```
 
 See [`docs/architecture.md`](docs/architecture.md) for task leases, result semantics, automation, authentication boundaries, and database behavior. Agent pairing and migration are documented in [`docs/agent-enrollment.md`](docs/agent-enrollment.md).

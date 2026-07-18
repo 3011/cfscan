@@ -1,6 +1,4 @@
 export type AgentStatus = 'online' | 'offline'
-export type AgentAuthMode = 'legacy' | 'token'
-
 export interface Agent {
   id: string
   name: string
@@ -11,7 +9,6 @@ export interface Agent {
   os: string
   architecture: string
   version: string
-  auth_mode: AgentAuthMode
   last_seen_at: string
   created_at: string
 }
@@ -41,8 +38,7 @@ export interface AgentEnrollment {
 }
 
 export interface AgentEnrollmentConfig {
-  public_web_url: string
-  public_agent_url: string
+  public_url: string
   agent_image: string
   agent_version: string
   ttl_seconds: number

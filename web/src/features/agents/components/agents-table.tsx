@@ -71,7 +71,7 @@ export function AgentsTable({ agents }: { agents: Agent[] }) {
       accessorKey: 'version',
       meta: { label: '版本' },
       header: ({ column }) => <DataTableColumnHeader column={column} title="版本" />,
-      cell: ({ row }) => <div><p>{row.original.version || '未知'}</p>{row.original.auth_mode === 'legacy' ? <p className="mt-1 text-xs text-muted-foreground">旧共享鉴权</p> : null}</div>,
+      cell: ({ row }) => <p>{row.original.version || '未知'}</p>,
     },
   ], [])
 

@@ -34,7 +34,7 @@ type enrollmentOptions struct {
 
 func runCLI(ctx context.Context, args []string, logger *slog.Logger) error {
 	if len(args) == 0 || args[0] == "run" {
-		return runLegacyOrIdentity(ctx, logger)
+		return runSavedIdentity(ctx, logger)
 	}
 	switch args[0] {
 	case "connect":
@@ -58,7 +58,7 @@ func printUsage() {
 Commands:
   connect   create a pairing request and wait for Web approval
   join      use a preauthorized one-time pairing token
-  run       run with saved identity or legacy environment variables
+  run       run with the saved independent identity
   version   print the Agent version
 `)
 }
@@ -90,7 +90,7 @@ func runEnrollment(ctx context.Context, args []string, preauthorized bool, logge
 		if options.pairOnly {
 			return nil
 		}
-		return runAgentLoop(ctx, &client{baseURL: identity.ServerURL, token: identity.Token, http: defaultHTTPClient()}, identity.AgentID, identity.Concurrency, logger)
+		return runAgentLoop(ctx, &client{baseURL: identity.ServerURL, token: identity.Token, http: defaultHTTPClient()}, identity.Concurrency, logger)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("load existing identity: %w", err)
 	}
@@ -149,7 +149,7 @@ func runEnrollment(ctx context.Context, args []string, preauthorized bool, logge
 	if options.pairOnly {
 		return nil
 	}
-	return runAgentLoop(ctx, &client{baseURL: options.serverURL, token: longTermToken, http: defaultHTTPClient()}, claimed.AgentID, claimed.Concurrency, logger)
+	return runAgentLoop(ctx, &client{baseURL: options.serverURL, token: longTermToken, http: defaultHTTPClient()}, claimed.Concurrency, logger)
 }
 
 func waitForEnrollment(ctx context.Context, apiClient *client, pairingToken, credentialID, credentialSecret string, interval int) (model.ClaimAgentEnrollmentResponse, error) {
