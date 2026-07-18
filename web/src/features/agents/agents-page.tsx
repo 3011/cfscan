@@ -4,7 +4,7 @@ import { MetricCard } from '@/components/shared/metric-card'
 import { PageHeader } from '@/components/shared/page-header'
 import { PageSkeleton } from '@/components/shared/page-skeleton'
 import { PermissionGate } from '@/components/shared/permission-gate'
-import { AddAgentSheet } from '@/features/agents/components/add-agent-sheet'
+import { AddAgentDialog } from '@/features/agents/components/add-agent-dialog'
 import { AgentsTable } from '@/features/agents/components/agents-table'
 import { PendingEnrollmentsCard } from '@/features/agents/components/pending-enrollments-card'
 import { useAgentEnrollments, useAgents } from '@/features/agents/hooks'
@@ -27,7 +27,7 @@ export function AgentsPage() {
       <PageHeader
         title="Agent 节点"
         description="管理分布式扫描节点、连接状态和运行能力。"
-        actions={<PermissionGate allowed={auth.canManage}><AddAgentSheet /></PermissionGate>}
+        actions={<PermissionGate allowed={auth.canManage}><AddAgentDialog /></PermissionGate>}
       />
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={Bot} title="节点总数" value={items.length} description="已完成连接的 Agent" />

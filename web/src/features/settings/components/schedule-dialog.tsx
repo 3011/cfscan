@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { TimezoneCombobox } from '@/features/settings/components/timezone-combobox'
 import { ScanConfigurationFields } from '@/features/scans/components/scan-configuration-fields'
@@ -49,7 +49,7 @@ function valuesFromSchedule(schedule?: ScanSchedule | null): ScanScheduleValues 
   }
 }
 
-export function ScheduleSheet({
+export function ScheduleDialog({
   open,
   onOpenChange,
   schedule,
@@ -94,12 +94,12 @@ export function ScheduleSheet({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={requestClose}>
-        <SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl lg:max-w-2xl">
-          <SheetHeader className="shrink-0 border-b px-6 py-5 pr-12">
-            <SheetTitle>{schedule ? '编辑定时计划' : '新建定时计划'}</SheetTitle>
-            <SheetDescription>中心端按 Cron 和时区创建扫描任务；浏览器关闭或服务器重启不会丢失计划。</SheetDescription>
-          </SheetHeader>
+      <Dialog open={open} onOpenChange={requestClose}>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl lg:max-w-3xl">
+          <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12">
+            <DialogTitle>{schedule ? '编辑定时计划' : '新建定时计划'}</DialogTitle>
+            <DialogDescription>中心端按 Cron 和时区创建扫描任务；浏览器关闭或服务器重启不会丢失计划。</DialogDescription>
+          </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6">
@@ -147,14 +147,14 @@ export function ScheduleSheet({
               <Separator />
               <ScanConfigurationFields advancedOpen={advancedOpen} onAdvancedOpenChange={setAdvancedOpen} />
               </div>
-              <SheetFooter className="shrink-0 border-t bg-background px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <DialogFooter className="shrink-0 border-t bg-background px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <Button type="button" variant="outline" onClick={() => requestClose(false)}>取消</Button>
                 <Button type="submit" disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null}{schedule ? '保存修改' : '创建计划'}</Button>
-              </SheetFooter>
+              </DialogFooter>
             </form>
           </Form>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>放弃未保存的计划配置？</AlertDialogTitle><AlertDialogDescription>关闭后，本次修改不会保存。</AlertDialogDescription></AlertDialogHeader>

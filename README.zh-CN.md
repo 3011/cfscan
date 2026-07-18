@@ -146,8 +146,8 @@ make check
 ```bash
 CFSCAN_DATABASE_URL='postgres://cfscan:password@127.0.0.1:5432/cfscan?sslmode=disable' \
 CFSCAN_PUBLIC_URL='https://cfscan.example.com' \
-CFSCAN_AGENT_IMAGE='ghcr.io/3011/cfscan-agent:v2.0.0' \
-CFSCAN_AGENT_VERSION='v2.0.0' \
+CFSCAN_AGENT_IMAGE='ghcr.io/3011/cfscan-agent:v2.1.0' \
+CFSCAN_AGENT_VERSION='v2.1.0' \
 CFSCAN_BOOTSTRAP_ADMIN_USERNAME='admin' \
 CFSCAN_BOOTSTRAP_ADMIN_PASSWORD='replace-with-a-strong-password' \
 CFSCAN_SESSION_TTL='24h' \

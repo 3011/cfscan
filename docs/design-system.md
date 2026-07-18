@@ -77,7 +77,8 @@ pnpm check:ui-boundaries
 | `dropdown-menu.tsx` | Label 保持可直接放在 Content 中，不要求业务额外包裹 Group | 兼容既有 shadcn 菜单 API，并避免 Base UI Group Context 错误 |
 | `combobox.tsx` / `searchable-combobox.tsx` | Popup 自动挂载到最近的 Sheet/Dialog；搜索输入不重复显示触发图标；业务 Trigger 与 Select 使用同一 `bg-input/50` 表面并左对齐文字 | 保证模态隔离、点击、键盘操作及同级筛选控件视觉一致 |
 | Combobox Empty | 非空列表时 live region 高度归零但不卸载 | 兼顾可访问性并消除空白区域 |
-| `sheet.tsx` 与业务 Sheet | 固定 Header、滚动 Content、固定不透明 Footer | 避免底部内容透出和移动端安全区问题 |
+| `dialog.tsx` 与业务 Dialog | 长任务使用固定 Header、滚动 Content、固定不透明 Footer；按内容使用 `sm:max-w-xl` 到 `lg:max-w-3xl` | 统一创建、编辑和审批流程，同时避免长内容超出视口 |
+| `sheet.tsx` | 仅供移动 Sidebar 和补充型只读面板使用 | 保持 Sheet“补充主内容”的官方语义，避免业务弹层风格混用 |
 | `use-mobile.ts` | 使用 `useSyncExternalStore` | 符合 React 19 与严格 Hook 规则 |
 | `sidebar.tsx` | 折叠分组标题禁用 pointer events；Tooltip 使用 350ms 主动悬停延迟，并只在折叠桌面状态挂载内容 | 避免透明分组标题遮挡导航，并防止折叠瞬间批量出现提示 |
 | `index.css` | 保留成功、警告、失败及图表语义色；Lucide 描边 1.75 | 数据产品需要稳定的状态辨识度 |
@@ -91,7 +92,7 @@ pnpm check:ui-boundaries
 - **PageHeader**：页面标题、描述与主操作；
 - **Card / Table surface**：业务内容；
 - **Muted surface**：说明、摘要和弱分组；
-- **Dialog / Sheet**：短流程使用 Dialog，长表单和编辑流程使用 Sheet；
+- **Dialog / Sheet**：创建、编辑和审批统一使用居中 Dialog；Sheet 只用于移动导航或补充型只读面板；
 - **页面内部导航**：同一页面的设置分类使用顶部单层 Tabs；不得在全局 Sidebar 之外再增加占据内容宽度的二级侧栏；
 - **Toast / AlertDialog**：结果反馈与不可逆操作确认。
 
@@ -130,7 +131,7 @@ pnpm check:ui-boundaries
 - 业务代码没有直接 primitive 导入；
 - 桌面和移动端没有横向溢出；
 - 浅色、深色和跟随系统正常；
-- Combobox、Select、Dropdown、Tooltip、Dialog、Sheet 和 AlertDialog 键盘可操作；
+- Combobox、Select、Dropdown、Tooltip、业务 Dialog、移动 Sidebar Sheet 和 AlertDialog 键盘可操作；
 - 管理员和查看者的可见操作与后端权限一致；
 - 浏览器没有运行时错误；
 - 本地适配清单与代码保持同步。

@@ -4,6 +4,14 @@ All notable public changes are documented here.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-07-18
+
+### Changed
+
+- Unified all create, edit, and enrollment workflows on centered Dialogs with fixed headers, scrollable content, and persistent action footers.
+- Reserved Sheet for complementary interface surfaces such as the mobile Sidebar, with an automated UI boundary preventing business features from reintroducing side sheets.
+
+
 ## [2.0.0] - 2026-07-18
 
 ### Changed

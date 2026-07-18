@@ -27,6 +27,9 @@ for (const file of walk(srcRoot)) {
   if (!file.startsWith(`${uiRoot}${path.sep}`) && /<(button|select|textarea)(?:\s|>)/.test(content)) {
     errors.push(`${relative}: use project UI components instead of raw interactive HTML elements.`)
   }
+  if (relative.startsWith(`src${path.sep}features${path.sep}`) && content.includes('@/components/ui/sheet')) {
+    errors.push(`${relative}: business workflows must use centered Dialog; Sheet is reserved for complementary UI such as the mobile Sidebar.`)
+  }
 }
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))

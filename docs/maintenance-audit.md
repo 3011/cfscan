@@ -9,7 +9,7 @@
 - UI primitive：29 个文件，其中 28 个来自 shadcn/ui 4.13.0 `base-rhea` Registry；
 - shared 业务组合组件：14 个；
 - 桌面与移动端各 8 个核心路由；
-- 管理员认证、筛选、分页、列管理、Dialog、Sheet、AlertDialog、Tooltip 和 Sidebar。
+- 管理员认证、筛选、分页、列管理、业务 Dialog、移动 Sidebar Sheet、AlertDialog、Tooltip 和 Sidebar。
 
 ## 已完成优化
 
@@ -30,7 +30,7 @@
 28 个官方来源组件中：
 
 - 12 个与当前 Registry 规范化后完全一致；
-- 16 个包含已记录适配，主要是 Lucide 图标替换、Vite 项目无需 `use client`、Select null 防护、Combobox 模态 Portal、Dropdown Label 兼容、Sheet/Footer、Sidebar Rail 与 Tooltip；
+- 16 个包含已记录适配，主要是 Lucide 图标替换、Vite 项目无需 `use client`、Select null 防护、Combobox 模态 Portal、Dropdown Label 兼容、长 Dialog 固定布局、Sidebar Rail 与 Tooltip；
 - `form.tsx` 是唯一项目维护的 primitive 兼容层。
 
 所有差异均已记录在 [`design-system.md`](design-system.md)，没有发现未说明的自定义 primitive。

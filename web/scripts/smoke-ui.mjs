@@ -18,7 +18,7 @@ function mockEnrollment() {
     requested_name: 'smoke-agent',
     os: 'linux',
     architecture: 'amd64',
-    version: 'v2.0.0-smoke',
+    version: 'v2.1.0-smoke',
     requested_concurrency: 32,
     name: mockEnrollmentStatus === 'pending' ? '' : 'smoke-agent',
     region: mockEnrollmentStatus === 'pending' ? '' : 'Smoke Region',
@@ -44,8 +44,8 @@ async function installEnrollmentMocks(page) {
     if (method === 'GET' && path === '/api/v1/agent-enrollments/config') {
       return fulfill(200, {
         public_url: baseURL,
-        agent_image: 'ghcr.io/3011/cfscan-agent:v2.0.0',
-        agent_version: 'v2.0.0',
+        agent_image: 'ghcr.io/3011/cfscan-agent:v2.1.0',
+        agent_version: 'v2.1.0',
         ttl_seconds: 600,
         poll_interval: 3,
       })
@@ -126,6 +126,23 @@ async function login(page) {
   await page.locator('input[name=password]').fill(password)
   await page.getByRole('button', { name: '登录', exact: true }).click()
   await page.getByRole('heading', { level: 1, name: '运行总览' }).waitFor({ timeout: 20_000 })
+}
+
+async function centeredDialogFitsViewport(page, dialog) {
+  if (!(await dialog.isVisible())) return false
+  return dialog.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    const centerX = box.left + box.width / 2
+    const centerY = box.top + box.height / 2
+    return (
+      Math.abs(centerX - window.innerWidth / 2) <= 2 &&
+      Math.abs(centerY - window.innerHeight / 2) <= 2 &&
+      box.left >= 8 &&
+      box.top >= 8 &&
+      box.right <= window.innerWidth - 8 &&
+      box.bottom <= window.innerHeight - 8
+    )
+  })
 }
 
 async function verifyPersistentReset(page, { route, heading, placeholder, setup }) {
@@ -339,6 +356,29 @@ try {
     !scheduleColumnText.includes('_')
   await page.keyboard.press('Escape')
 
+  await page.getByRole('button', { name: '新建计划' }).click()
+  const scheduleDialog = page.locator('[data-slot=dialog-content]').last()
+  await scheduleDialog.waitFor()
+  report.interactions.scheduleDialog = await centeredDialogFitsViewport(page, scheduleDialog)
+  await scheduleDialog.getByRole('button', { name: '取消' }).click()
+  await scheduleDialog.waitFor({ state: 'hidden' })
+
+  await page.getByRole('tab', { name: '黑名单复查' }).click()
+  await page.getByRole('button', { name: '编辑策略' }).click()
+  const blacklistDialog = page.locator('[data-slot=dialog-content]').last()
+  await blacklistDialog.waitFor()
+  report.interactions.blacklistDialog = await centeredDialogFitsViewport(page, blacklistDialog)
+  await blacklistDialog.getByRole('button', { name: '取消' }).click()
+  await blacklistDialog.waitFor({ state: 'hidden' })
+
+  await page.getByRole('tab', { name: '数据源同步' }).click()
+  await page.getByRole('button', { name: '编辑', exact: true }).first().click()
+  const sourceSyncDialog = page.locator('[data-slot=dialog-content]').last()
+  await sourceSyncDialog.waitFor()
+  report.interactions.sourceSyncDialog = await centeredDialogFitsViewport(page, sourceSyncDialog)
+  await sourceSyncDialog.getByRole('button', { name: '取消' }).click()
+  await sourceSyncDialog.waitFor({ state: 'hidden' })
+
   await page.getByRole('tab', { name: '外观' }).click()
   const themeGroup = page.getByRole('radiogroup', { name: '界面主题' })
   await themeGroup.waitFor()
@@ -352,17 +392,18 @@ try {
     await page.goto(`${baseURL}/agents`, { waitUntil: 'domcontentloaded' })
     await page.getByRole('heading', { level: 1, name: 'Agent 节点' }).waitFor()
     await page.getByRole('button', { name: '添加 Agent' }).click()
-    const agentSheet = page.locator('[data-slot=sheet-content]')
-    await agentSheet.waitFor()
-    const deviceCommandVisible = (await agentSheet.innerText()).includes(`cfscan-agent connect --server ${baseURL}`)
-    await agentSheet.getByRole('radio', { name: /自动化部署/ }).click()
-    await agentSheet.getByLabel('节点名称').fill('automated-smoke-agent')
-    await agentSheet.getByLabel('地区').fill('Smoke Region')
-    await agentSheet.getByRole('button', { name: '生成部署命令' }).click()
-    await agentSheet.getByText('一次性部署命令已生成', { exact: true }).waitFor()
-    const generatedCommandVisible = (await agentSheet.innerText()).includes(`cfscan-agent join --server ${baseURL} --token`)
-    report.interactions.agentEnrollmentSheet = deviceCommandVisible && generatedCommandVisible
-    await agentSheet.getByRole('button', { name: '关闭' }).click()
+    const agentDialog = page.locator('[data-slot=dialog-content]')
+    await agentDialog.waitFor()
+    const deviceCommandVisible = (await agentDialog.innerText()).includes(`cfscan-agent connect --server ${baseURL}`)
+    await agentDialog.getByRole('radio', { name: /自动化部署/ }).click()
+    await agentDialog.getByLabel('节点名称').fill('automated-smoke-agent')
+    await agentDialog.getByLabel('地区').fill('Smoke Region')
+    await agentDialog.getByRole('button', { name: '生成部署命令' }).click()
+    await agentDialog.getByText('一次性部署命令已生成', { exact: true }).waitFor()
+    const generatedCommandVisible = (await agentDialog.innerText()).includes(`cfscan-agent join --server ${baseURL} --token`)
+    report.interactions.agentEnrollmentDialog =
+      deviceCommandVisible && generatedCommandVisible && await centeredDialogFitsViewport(page, agentDialog)
+    await agentDialog.getByRole('button', { name: '关闭' }).click()
 
     mockEnrollmentStatus = 'pending'
     await page.goto(`${baseURL}/agents/pair/${mockPairingToken}`, { waitUntil: 'domcontentloaded' })
@@ -385,7 +426,8 @@ try {
   await page.getByRole('heading', { level: 1, name: '扫描任务' }).waitFor()
   await page.getByRole('button', { name: '创建扫描任务' }).click()
   await page.getByLabel('任务名称').fill('Rhea smoke unsaved')
-  report.interactions.sheet = await page.locator('[data-slot=sheet-content]').isVisible()
+  const scanDialog = page.locator('[data-slot=dialog-content]').last()
+  report.interactions.scanDialog = await centeredDialogFitsViewport(page, scanDialog)
   await page.getByRole('button', { name: '取消' }).click()
   const alertDialog = page.locator('[data-slot=alert-dialog-content]')
   await alertDialog.waitFor()
@@ -508,12 +550,12 @@ try {
     await mobile.goto(`${baseURL}/agents`, { waitUntil: 'domcontentloaded' })
     await mobile.getByRole('heading', { level: 1, name: 'Agent 节点' }).waitFor()
     await mobile.getByRole('button', { name: '添加 Agent' }).click()
-    const mobileAgentSheet = mobile.locator('[data-slot=sheet-content]')
-    await mobileAgentSheet.waitFor()
-    report.interactions.mobileAgentEnrollmentSheet =
-      (await mobileAgentSheet.isVisible()) &&
+    const mobileAgentDialog = mobile.locator('[data-slot=dialog-content]')
+    await mobileAgentDialog.waitFor()
+    report.interactions.mobileAgentEnrollmentDialog =
+      await centeredDialogFitsViewport(mobile, mobileAgentDialog) &&
       (await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0
-    await mobileAgentSheet.getByRole('button', { name: '关闭' }).click()
+    await mobileAgentDialog.getByRole('button', { name: '关闭' }).click()
 
     mockEnrollmentStatus = 'pending'
     await mobile.goto(`${baseURL}/agents/pair/${mockPairingToken}`, { waitUntil: 'domcontentloaded' })
@@ -522,12 +564,45 @@ try {
       (await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0
   }
 
+  await mobile.goto(`${baseURL}/jobs`, { waitUntil: 'domcontentloaded' })
+  await mobile.getByRole('heading', { level: 1, name: '扫描任务' }).waitFor()
+  await mobile.getByRole('button', { name: '创建扫描任务' }).click()
+  const mobileScanDialog = mobile.locator('[data-slot=dialog-content]').last()
+  await mobileScanDialog.waitFor()
+  report.interactions.mobileScanDialog = await centeredDialogFitsViewport(mobile, mobileScanDialog)
+  await mobileScanDialog.getByRole('button', { name: '取消' }).click()
+  await mobileScanDialog.waitFor({ state: 'hidden' })
+
   await mobile.goto(`${baseURL}/settings`, { waitUntil: 'domcontentloaded' })
   await mobile.getByRole('heading', { level: 1, name: '设置' }).waitFor()
   const mobileSettingsTabs = mobile.locator('[data-slot=tabs]').first()
   report.interactions.mobileSettingsNavigation =
     (await mobileSettingsTabs.getAttribute('data-orientation')) === 'horizontal' &&
     (await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0
+
+  await mobile.getByRole('tab', { name: '扫描计划' }).click()
+  await mobile.getByRole('button', { name: '新建计划' }).click()
+  const mobileScheduleDialog = mobile.locator('[data-slot=dialog-content]').last()
+  await mobileScheduleDialog.waitFor()
+  report.interactions.mobileScheduleDialog = await centeredDialogFitsViewport(mobile, mobileScheduleDialog)
+  await mobileScheduleDialog.getByRole('button', { name: '取消' }).click()
+  await mobileScheduleDialog.waitFor({ state: 'hidden' })
+
+  await mobile.getByRole('tab', { name: '黑名单复查' }).click()
+  await mobile.getByRole('button', { name: '编辑策略' }).click()
+  const mobileBlacklistDialog = mobile.locator('[data-slot=dialog-content]').last()
+  await mobileBlacklistDialog.waitFor()
+  report.interactions.mobileBlacklistDialog = await centeredDialogFitsViewport(mobile, mobileBlacklistDialog)
+  await mobileBlacklistDialog.getByRole('button', { name: '取消' }).click()
+  await mobileBlacklistDialog.waitFor({ state: 'hidden' })
+
+  await mobile.getByRole('tab', { name: '数据源同步' }).click()
+  await mobile.getByRole('button', { name: '编辑', exact: true }).first().click()
+  const mobileSourceSyncDialog = mobile.locator('[data-slot=dialog-content]').last()
+  await mobileSourceSyncDialog.waitFor()
+  report.interactions.mobileSourceSyncDialog = await centeredDialogFitsViewport(mobile, mobileSourceSyncDialog)
+  await mobileSourceSyncDialog.getByRole('button', { name: '取消' }).click()
+  await mobileSourceSyncDialog.waitFor({ state: 'hidden' })
 
   await mobile.locator('header').getByRole('button', { name: 'Toggle Sidebar' }).click()
   const mobileSidebar = mobile.locator('[data-mobile=true]')
