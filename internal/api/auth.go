@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	authservice "github.com/3011/cfscan/internal/auth"
-	"github.com/3011/cfscan/internal/model"
+	authservice "github.com/3011/cfscan/v2/internal/auth"
+	"github.com/3011/cfscan/v2/internal/model"
 )
 
 type currentUserKey struct{}

@@ -17,9 +17,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/3011/cfscan/internal/config"
-	"github.com/3011/cfscan/internal/model"
-	"github.com/3011/cfscan/internal/probe"
+	"github.com/3011/cfscan/v2/internal/config"
+	"github.com/3011/cfscan/v2/internal/model"
+	"github.com/3011/cfscan/v2/internal/probe"
 )
 
 var version = "dev"

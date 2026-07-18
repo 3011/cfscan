@@ -1,4 +1,4 @@
-module github.com/3011/cfscan
+module github.com/3011/cfscan/v2
 
 go 1.25.0
 

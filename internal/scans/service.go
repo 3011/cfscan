@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/3011/cfscan/internal/model"
-	"github.com/3011/cfscan/internal/targets"
+	"github.com/3011/cfscan/v2/internal/model"
+	"github.com/3011/cfscan/v2/internal/targets"
 )
 
 type Store interface {
