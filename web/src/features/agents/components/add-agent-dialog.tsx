@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAgentEnrollmentConfig, useCreatePreauthorizedEnrollment } from '@/features/agents/hooks'
 import type { CreatePreauthorizedEnrollmentResponse } from '@/features/agents/types'
@@ -41,7 +41,7 @@ function CommandBlock({ value }: { value: string }) {
   )
 }
 
-export function AddAgentSheet() {
+export function AddAgentDialog() {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'device' | 'preauthorized'>('device')
   const [generated, setGenerated] = useState<CreatePreauthorizedEnrollmentResponse | null>(null)
@@ -77,14 +77,14 @@ export function AddAgentSheet() {
   }
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetTrigger render={<Button />}><Plus />添加 Agent</SheetTrigger>
-      <SheetContent className="sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>连接 Agent</SheetTitle>
-          <SheetDescription>普通部署通过浏览器批准；无人值守部署使用一次性预授权密钥。</SheetDescription>
-        </SheetHeader>
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger render={<Button />}><Plus />添加 Agent</DialogTrigger>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12">
+          <DialogTitle>连接 Agent</DialogTitle>
+          <DialogDescription>普通部署通过浏览器批准；无人值守部署使用一次性预授权密钥。</DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
           <RadioGroup value={mode} onValueChange={(value) => { setMode(value as typeof mode); setGenerated(null) }} className="grid gap-3 sm:grid-cols-2">
             <Label className="items-start gap-3 rounded-2xl border p-4 has-data-checked:border-primary has-data-checked:bg-primary/5">
               <RadioGroupItem value="device" className="mt-0.5" />
@@ -134,11 +134,11 @@ export function AddAgentSheet() {
             </Form>
           )}
         </div>
-        <SheetFooter className="border-t bg-popover">
-          {mode === 'preauthorized' && !generated ? <Button type="submit" form="preauthorize-agent-form" disabled={create.isPending}>{create.isPending ? <Loader2 className="animate-spin" /> : null}生成部署命令</Button> : null}
+        <DialogFooter className="shrink-0 border-t bg-popover px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>关闭</Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          {mode === 'preauthorized' && !generated ? <Button type="submit" form="preauthorize-agent-form" disabled={create.isPending}>{create.isPending ? <Loader2 className="animate-spin" /> : null}生成部署命令</Button> : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -11,7 +11,7 @@ import { PageSkeleton } from '@/components/shared/page-skeleton'
 import { AutomationOverview } from '@/features/settings/components/automation-overview'
 import { AutomationRunsTable } from '@/features/settings/components/automation-runs-table'
 import { BlacklistRecheckPanel } from '@/features/settings/components/blacklist-recheck-panel'
-import { ScheduleSheet } from '@/features/settings/components/schedule-sheet'
+import { ScheduleDialog } from '@/features/settings/components/schedule-dialog'
 import { SchedulesTable } from '@/features/settings/components/schedules-table'
 import { SourceSyncPanel } from '@/features/settings/components/source-sync-panel'
 import { useScanSchedules } from '@/features/settings/hooks'
@@ -89,7 +89,7 @@ type SettingsSection = (typeof settingsSections)[number]['value']
 export function SettingsPage() {
   const auth = useAuth()
   const [section, setSection] = useState<SettingsSection>('overview')
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ScanSchedule | null>(null)
 
   return (
@@ -122,8 +122,8 @@ export function SettingsPage() {
           <TabsContent value="schedules">
             <ScanSchedulesPanel
               canManage={auth.canManage}
-              onCreate={() => { setEditing(null); setSheetOpen(true) }}
-              onEdit={(item) => { setEditing(item); setSheetOpen(true) }}
+              onCreate={() => { setEditing(null); setDialogOpen(true) }}
+              onEdit={(item) => { setEditing(item); setDialogOpen(true) }}
             />
           </TabsContent>
           <TabsContent value="blacklist"><BlacklistRecheckPanel canManage={auth.canManage} /></TabsContent>
@@ -133,9 +133,9 @@ export function SettingsPage() {
         </div>
       </Tabs>
       {auth.canManage ? (
-        <ScheduleSheet
-          open={sheetOpen}
-          onOpenChange={(open) => { setSheetOpen(open); if (!open) setEditing(null) }}
+        <ScheduleDialog
+          open={dialogOpen}
+          onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null) }}
           schedule={editing}
         />
       ) : null}

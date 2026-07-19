@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageSkeleton } from '@/components/shared/page-skeleton'
@@ -54,9 +54,9 @@ export function BlacklistRecheckPanel({ canManage }: { canManage: boolean }) {
         </CardContent>
       </Card>
 
-      <Sheet open={canManage && open} onOpenChange={setOpen}>
-        <SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
-          <SheetHeader className="shrink-0 border-b px-6 py-5 pr-12"><SheetTitle>编辑黑名单复查</SheetTitle><SheetDescription>所有自动复查和黑名单页的“立即复查”都会使用这套配置。</SheetDescription></SheetHeader>
+      <Dialog open={canManage && open} onOpenChange={setOpen}>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12"><DialogTitle>编辑黑名单复查</DialogTitle><DialogDescription>所有自动复查和黑名单页的“立即复查”都会使用这套配置。</DialogDescription></DialogHeader>
           <Form {...form}><form onSubmit={form.handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col"><div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-6">
             <FormField control={form.control} name="enabled" render={({ field }) => <FormItem className="flex items-center justify-between rounded-lg border p-4"><div><FormLabel>启用自动复查</FormLabel><FormDescription>停用后仍可手动立即运行。</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>} />
             <div className="grid gap-4 sm:grid-cols-2">
@@ -78,10 +78,10 @@ export function BlacklistRecheckPanel({ canManage }: { canManage: boolean }) {
                 ['retry_minutes', '再次失败等待（分钟）', 1, 10080],
               ] as const).map(([name, label, min, max]) => <FormField key={name} control={form.control} name={name} render={({ field }) => <FormItem><FormLabel>{label}</FormLabel><FormControl><Input type="number" min={min} max={max} value={field.value} onChange={(event) => field.onChange(event.target.valueAsNumber)} /></FormControl><FormMessage /></FormItem>} />)}
             </div>
-            </div><SheetFooter className="shrink-0 border-t bg-background px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]"><Button type="button" variant="outline" onClick={() => setOpen(false)}>取消</Button><Button type="submit" disabled={update.isPending}>{update.isPending ? <Loader2 className="animate-spin" /> : null}保存设置</Button></SheetFooter>
+            </div><DialogFooter className="shrink-0 border-t bg-background px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]"><Button type="button" variant="outline" onClick={() => setOpen(false)}>取消</Button><Button type="submit" disabled={update.isPending}>{update.isPending ? <Loader2 className="animate-spin" /> : null}保存设置</Button></DialogFooter>
           </form></Form>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

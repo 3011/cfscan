@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageSkeleton } from '@/components/shared/page-skeleton'
@@ -56,9 +56,9 @@ export function SourceSyncPanel({ canManage }: { canManage: boolean }) {
         ))}
       </div>
 
-      <Sheet open={canManage && Boolean(editing)} onOpenChange={(open) => { if (!open) setEditing(null) }}>
-        <SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-          <SheetHeader className="shrink-0 border-b px-6 py-5 pr-12"><SheetTitle>编辑数据源同步</SheetTitle><SheetDescription>{editing?.name}</SheetDescription></SheetHeader>
+      <Dialog open={canManage && Boolean(editing)} onOpenChange={(open) => { if (!open) setEditing(null) }}>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+          <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12"><DialogTitle>编辑数据源同步</DialogTitle><DialogDescription>{editing?.name}</DialogDescription></DialogHeader>
           <Form {...form}><form onSubmit={form.handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col"><div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-6">
             <FormField control={form.control} name="enabled" render={({ field }) => <FormItem className="flex items-center justify-between rounded-lg border p-4"><div><FormLabel>启用定时同步</FormLabel><FormDescription>停用后仍可手动立即同步。</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>} />
             <div className="grid gap-4 sm:grid-cols-2">
@@ -66,10 +66,10 @@ export function SourceSyncPanel({ canManage }: { canManage: boolean }) {
               <FormField control={form.control} name="timezone" render={({ field }) => <FormItem><FormLabel>时区</FormLabel><FormControl><TimezoneCombobox value={field.value} onValueChange={field.onChange} /></FormControl><FormMessage /></FormItem>} />
             </div>
             <FormField control={form.control} name="run_on_startup" render={({ field }) => <FormItem className="flex items-center justify-between rounded-lg border p-4"><div><FormLabel>中心启动时立即同步</FormLabel><FormDescription>每次中心服务重启后执行一次，并重新计算下次时间。</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>} />
-            </div><SheetFooter className="shrink-0 border-t bg-background px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]"><Button type="button" variant="outline" onClick={() => setEditing(null)}>取消</Button><Button type="submit" disabled={update.isPending}>{update.isPending ? <Loader2 className="animate-spin" /> : null}保存设置</Button></SheetFooter>
+            </div><DialogFooter className="shrink-0 border-t bg-background px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]"><Button type="button" variant="outline" onClick={() => setEditing(null)}>取消</Button><Button type="submit" disabled={update.isPending}>{update.isPending ? <Loader2 className="animate-spin" /> : null}保存设置</Button></DialogFooter>
           </form></Form>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

@@ -99,17 +99,18 @@ web/src/components/shared/data-table/data-table-reset-button.tsx
 - 错误信息位于字段附近，不只使用 Toast；
 - 固定枚举使用 Select，长列表使用 Combobox；
 - Switch 用于“立即生效的启停”，不要代替需要保存的普通布尔字段；
-- 表单提交按钮放在 Dialog/Sheet Footer；
-- 有未保存修改的 Sheet/Dialog 在关闭前必须确认；
+- 表单提交按钮放在 Dialog Footer；
+- 有未保存修改的 Dialog 在关闭前必须确认；
 - 重置自己密码导致当前会话失效时，前端必须返回登录页；
 - 不要在 placeholder 中放置唯一的字段说明。
 
 ## Dialog、Sheet 与确认
 
-- **Dialog**：短表单、简短确认和少量字段；
-- **Sheet**：长表单、分组配置、需要保留页面上下文的编辑；
+- **Dialog**：创建、编辑、审批和其他需要用户集中完成的业务任务；字段较多时使用更宽的居中 Dialog；
+- **Sheet**：只用于补充主界面的非阻断内容，例如移动端 Sidebar 或未来的只读详情检查器；业务 feature 不得直接使用 Sheet 承载表单；
 - **AlertDialog**：删除、停止、放弃未保存修改等需要用户明确确认的操作；
-- Sheet 使用固定 Header、可滚动 Content、固定且完全不透明的 Footer；
+- 长 Dialog 使用固定 Header、可滚动 Content、固定且完全不透明的 Footer；
+- Dialog 最大高度不得超过视口，移动端保留四周安全间距并让内容区独立滚动；
 - Popup 在模态内必须保持正确 Portal、焦点锁和键盘操作；
 - 关闭动画期间不得出现可点击但不可见的重复触发器。
 
@@ -147,7 +148,7 @@ web/src/components/shared/data-table/data-table-reset-button.tsx
 - 以业务优先级决定隐藏内容，不按桌面布局机械缩放；
 - 移动端 Header 保持 48px；
 - Tabs 和筛选可横向滚动或换行，但页面本身不得横向溢出；
-- Sheet、Dialog 和 Popup 不得超出视口；
+- Dialog、移动 Sidebar Sheet 和 Popup 不得超出视口；
 - 触控目标不能因紧凑视觉小于可操作区域；
 - 桌面浅色与移动深色是永久浏览器回归的最低覆盖。
 
@@ -195,7 +196,7 @@ web/src/components/shared/data-table/data-table-reset-button.tsx
 | 五个时间范围 | Select | 固定短枚举 |
 | 四级地理筛选 | Combobox | 同一套级联维度 |
 | 删除账号 | AlertDialog | 不可逆操作 |
-| 编辑扫描计划 | Sheet | 长表单、需保留页面上下文 |
+| 编辑扫描计划 | Dialog | 集中完成的长表单，使用固定标题、滚动内容和固定操作区 |
 | 重置密码 | Dialog | 短表单 |
 
 新增场景无法明确判断时，优先保持同类业务组件一致，并在本文件记录最终决定。

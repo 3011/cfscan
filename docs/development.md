@@ -154,7 +154,7 @@ BASE_URL=http://127.0.0.1:4173 \
 pnpm test:ui
 ```
 
-永久回归覆盖八个桌面路由、八个移动路由、权限、Sidebar、Tabs、Select、Combobox、列管理、重置、Tooltip、Dialog、Sheet、AlertDialog、主题、横向溢出和全局错误边界。
+永久回归覆盖八个桌面路由、八个移动路由、权限、Sidebar、Tabs、Select、Combobox、列管理、重置、Tooltip、业务 Dialog、移动 Sidebar Sheet、AlertDialog、主题、横向溢出和全局错误边界。
 
 测试只应读取生产等价数据，涉及表单时应打开、输入后取消，不应在共享环境创建或删除真实业务数据。
 

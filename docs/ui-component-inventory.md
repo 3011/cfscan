@@ -24,12 +24,12 @@
 | Checkbox | 官方衍生 | 布尔多选 |
 | Collapsible | 官方衍生 | 高级配置展开 |
 | Combobox | 官方衍生 + 本地适配 | 搜索、Portal 与 live region 适配 |
-| Dialog | 官方衍生 | 短表单与确认流程 |
+| Dialog | 官方衍生 | 创建、编辑、审批等业务任务；长内容使用固定 Header/Footer 与滚动 Content |
 | Dropdown Menu | 官方衍生 | 行操作、用户菜单、主题菜单 |
 | Progress | 官方衍生 | 扫描任务进度 |
 | Radio Group | 官方衍生 | 主题等互斥选项 |
 | Select | 官方衍生 + 本地适配 | 固定短枚举，禁止意外 null |
-| Sheet | 官方衍生 | 长表单、移动导航 |
+| Sheet | 官方衍生 | 移动导航和补充型只读面板，不承载业务表单 |
 | Sidebar | 官方衍生 | Rhea inset App Shell |
 | Switch | 官方衍生 | 启停配置 |
 | Tabs | 官方衍生 | 同页面视图与设置分区 |
