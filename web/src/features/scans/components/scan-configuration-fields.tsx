@@ -115,7 +115,7 @@ export function ScanConfigurationFields({
         )} />
       </section>
 
-      <Separator />
+      <Separator className="my-6" />
 
       <section className="space-y-4">
         <div>
@@ -150,7 +150,7 @@ export function ScanConfigurationFields({
         )} />
       </section>
 
-      <Separator />
+      <Separator className="my-6" />
 
       <Collapsible open={advancedOpen} onOpenChange={onAdvancedOpenChange}>
         <CollapsibleTrigger render={<Button type="button" variant="ghost" className="w-full justify-between px-0 hover:bg-transparent" />}>

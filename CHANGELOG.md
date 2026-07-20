@@ -4,6 +4,14 @@ All notable public changes are documented here.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-07-20
+
+### Fixed
+
+- Positioned Select popups below and left-aligned with their triggers instead of overlapping the closed control.
+- Restored consistent vertical spacing between scan configuration sections and separators.
+- Prevented collapsed Sidebar tooltips from flashing in bulk while the Sidebar width transition is still running.
+
 ## [2.1.0] - 2026-07-18
 
 ### Changed

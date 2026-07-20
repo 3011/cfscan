@@ -513,6 +513,18 @@ function SidebarMenuButton({
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const { isMobile, state } = useSidebar()
+  const [tooltipEnabled, setTooltipEnabled] = React.useState(false)
+
+  React.useEffect(() => {
+    if (state !== "collapsed" || isMobile || !tooltip) {
+      setTooltipEnabled(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => setTooltipEnabled(true), 250)
+    return () => window.clearTimeout(timer)
+  }, [isMobile, state, tooltip])
+
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
@@ -541,9 +553,9 @@ function SidebarMenuButton({
   }
 
   return (
-    <Tooltip>
+    <Tooltip disabled={!tooltipEnabled}>
       {comp}
-      {state === "collapsed" && !isMobile ? (
+      {tooltipEnabled ? (
         <TooltipContent
           side="right"
           align="center"

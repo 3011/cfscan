@@ -107,7 +107,7 @@ docker run -d \
   --restart unless-stopped \
   -e CFSCAN_AGENT_IDENTITY_FILE=/var/lib/cfscan-agent/identity.json \
   -v cfscan-agent-data:/var/lib/cfscan-agent \
-  ghcr.io/3011/cfscan-agent:v2.1.0 \
+  ghcr.io/3011/cfscan-agent:v2.1.1 \
   connect --server https://cfscan.example.com
 ```
 

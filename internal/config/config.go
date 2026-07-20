@@ -36,8 +36,8 @@ func LoadServer() Server {
 		SessionTTL:             envDuration("CFSCAN_SESSION_TTL", 24*time.Hour),
 		CookieSecure:           envBool("CFSCAN_COOKIE_SECURE", true),
 		PublicURL:              env("CFSCAN_PUBLIC_URL", "http://localhost:18081"),
-		AgentImage:             env("CFSCAN_AGENT_IMAGE", "ghcr.io/3011/cfscan-agent:v2.1.0"),
-		AgentVersion:           env("CFSCAN_AGENT_VERSION", "v2.1.0"),
+		AgentImage:             env("CFSCAN_AGENT_IMAGE", "ghcr.io/3011/cfscan-agent:v2.1.1"),
+		AgentVersion:           env("CFSCAN_AGENT_VERSION", "v2.1.1"),
 		EnrollmentTTL:          envDuration("CFSCAN_AGENT_ENROLLMENT_TTL", 10*time.Minute),
 		EnrollmentPollInterval: envDuration("CFSCAN_AGENT_ENROLLMENT_POLL_INTERVAL", 3*time.Second),
 	}

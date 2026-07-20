@@ -18,7 +18,7 @@ function mockEnrollment() {
     requested_name: 'smoke-agent',
     os: 'linux',
     architecture: 'amd64',
-    version: 'v2.1.0-smoke',
+    version: 'v2.1.1-smoke',
     requested_concurrency: 32,
     name: mockEnrollmentStatus === 'pending' ? '' : 'smoke-agent',
     region: mockEnrollmentStatus === 'pending' ? '' : 'Smoke Region',
@@ -44,8 +44,8 @@ async function installEnrollmentMocks(page) {
     if (method === 'GET' && path === '/api/v1/agent-enrollments/config') {
       return fulfill(200, {
         public_url: baseURL,
-        agent_image: 'ghcr.io/3011/cfscan-agent:v2.1.0',
-        agent_version: 'v2.1.0',
+        agent_image: 'ghcr.io/3011/cfscan-agent:v2.1.1',
+        agent_version: 'v2.1.1',
         ttl_seconds: 600,
         poll_interval: 3,
       })
@@ -309,10 +309,29 @@ try {
   report.interactions.combobox = await combobox.isVisible()
   await page.keyboard.press('Escape')
 
-  await page.getByRole('combobox', { name: '可用状态' }).click()
+  const selectTrigger = page.getByRole('combobox', { name: '可用状态' })
+  await selectTrigger.click()
   const select = page.locator('[data-slot=select-content]')
   await select.waitFor()
+  await page.waitForTimeout(150)
+  const selectGeometry = await page.evaluate(() => {
+    const trigger = document.querySelector('[data-slot=select-trigger][aria-label="可用状态"]')
+    const popup = document.querySelector('[data-slot=select-content]')
+    if (!trigger || !popup) return null
+    const triggerBox = trigger.getBoundingClientRect()
+    const popupBox = popup.getBoundingClientRect()
+    return {
+      leftDelta: Math.abs(popupBox.left - triggerBox.left),
+      verticalGap: popupBox.top - triggerBox.bottom,
+      widthDelta: Math.abs(popupBox.width - triggerBox.width),
+    }
+  })
   report.interactions.select = await select.isVisible()
+  report.interactions.selectAnchoredBelowTrigger =
+    selectGeometry !== null &&
+    selectGeometry.leftDelta <= 1 &&
+    selectGeometry.verticalGap >= 3 &&
+    selectGeometry.widthDelta <= 1
   await page.keyboard.press('Escape')
 
   await page.locator('[data-slot=sidebar-footer] [data-slot=dropdown-menu-trigger]').click()
@@ -428,6 +447,21 @@ try {
   await page.getByLabel('任务名称').fill('Rhea smoke unsaved')
   const scanDialog = page.locator('[data-slot=dialog-content]').last()
   report.interactions.scanDialog = await centeredDialogFitsViewport(page, scanDialog)
+  const scanSectionSpacing = await scanDialog.evaluate((dialog) => {
+    const separator = dialog.querySelector('[data-slot=separator]')
+    const previous = separator?.previousElementSibling
+    const next = separator?.nextElementSibling
+    if (!separator || !previous || !next) return null
+    const separatorBox = separator.getBoundingClientRect()
+    const previousBox = previous.getBoundingClientRect()
+    const nextBox = next.getBoundingClientRect()
+    return {
+      before: separatorBox.top - previousBox.bottom,
+      after: nextBox.top - separatorBox.bottom,
+    }
+  })
+  report.interactions.scanSectionSpacing =
+    scanSectionSpacing !== null && scanSectionSpacing.before >= 20 && scanSectionSpacing.after >= 20
   await page.getByRole('button', { name: '取消' }).click()
   const alertDialog = page.locator('[data-slot=alert-dialog-content]')
   await alertDialog.waitFor()
@@ -465,8 +499,23 @@ try {
     railOnHover.height <= 64.5 &&
     Math.abs(railOnHover.top - railOnHover.elementHeight / 2) <= 1
 
-  await page.locator('header').getByRole('button', { name: 'Toggle Sidebar' }).click()
-  await page.waitForTimeout(250)
+  await page.locator('[data-slot=sidebar-inner] a[href="/blacklist"]').hover()
+  await page.evaluate(() => {
+    window.__cfscanTooltipFlash = { max: 0, until: performance.now() + 320 }
+    const sample = () => {
+      const state = window.__cfscanTooltipFlash
+      if (!state) return
+      state.max = Math.max(state.max, document.querySelectorAll('[data-slot=tooltip-content]').length)
+      if (performance.now() < state.until) requestAnimationFrame(sample)
+    }
+    requestAnimationFrame(sample)
+  })
+  await page.keyboard.press('Control+b')
+  await page.waitForTimeout(350)
+  report.interactions.sidebarNoTooltipFlash =
+    await page.evaluate(() => window.__cfscanTooltipFlash?.max === 0)
+  await page.mouse.move(1000, 120)
+
   const collapsedGeometry = await page.evaluate(() => {
     const sidebar = document.querySelector('[data-slot=sidebar-inner]')
     const logoButton = sidebar?.querySelector('[data-slot=sidebar-header] [data-slot=sidebar-menu-button]')
@@ -499,8 +548,6 @@ try {
     collapsedGeometry.cloudLogo &&
     !collapsedGeometry.radarLogo
   report.interactions.headerSeparatorRemoved = collapsedGeometry.headerSeparators === 0
-  await page.waitForTimeout(50)
-  report.interactions.sidebarNoTooltipFlash = (await page.locator('[data-slot=tooltip-content]').count()) === 0
   await page.waitForTimeout(300)
   await page.locator('[data-slot=sidebar-inner] a[href="/results"]').hover()
   const tooltip = page.locator('[data-slot=tooltip-content]')
