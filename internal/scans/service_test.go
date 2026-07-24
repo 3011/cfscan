@@ -33,6 +33,15 @@ func TestValidateSamplingModes(t *testing.T) {
 	if err := Validate(input); err != nil {
 		t.Fatalf("one-per-prefix should not require target_count: %v", err)
 	}
+	input.SamplingMode = SamplingModeLeague
+	input.TargetCount = 256
+	if err := Validate(input); err != nil {
+		t.Fatalf("league should accept a bounded per-agent budget: %v", err)
+	}
+	input.TargetCount = 0
+	if err := Validate(input); err == nil {
+		t.Fatal("league should require a positive per-agent budget")
+	}
 	input.SamplingMode = "unknown"
 	if err := Validate(input); err == nil {
 		t.Fatal("expected unknown sampling mode to fail")

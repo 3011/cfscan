@@ -55,3 +55,43 @@ func TestResultFilterRejectsInvalidOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestTrendFilterDefaultsAndExplicitConfiguration(t *testing.T) {
+	request := httptest.NewRequest("GET", "/api/v1/results/trend?agent_id=11111111-1111-4111-8111-111111111111&target_ip=104.16.0.1&scheme=http&hostname=example.com&path=/health&port=8080&attempts=4&timeout_ms=2500&time_range=24h", nil)
+	before := time.Now().UTC().Add(-24*time.Hour - time.Second)
+	filter, err := trendFilterFromRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filter.AgentID == "" || filter.TargetIP != "104.16.0.1" || filter.Scheme != "http" || filter.Hostname != "example.com" || filter.Path != "/health" {
+		t.Fatalf("unexpected trend identity: %+v", filter)
+	}
+	if filter.Port != 8080 || filter.Attempts != 4 || filter.TimeoutMS != 2500 {
+		t.Fatalf("unexpected trend probe configuration: %+v", filter)
+	}
+	if filter.Since.Before(before) {
+		t.Fatalf("expected a recent 24h boundary, got %s", filter.Since)
+	}
+}
+
+func TestTrendFilterRejectsInvalidOptions(t *testing.T) {
+	validAgent := "11111111-1111-4111-8111-111111111111"
+	base := "/api/v1/results/trend?agent_id=" + validAgent + "&target_ip=104.16.0.1"
+	paths := []string{
+		"/api/v1/results/trend?agent_id=not-a-uuid&target_ip=104.16.0.1",
+		"/api/v1/results/trend?agent_id=" + validAgent + "&target_ip=invalid",
+		base + "&scheme=ftp",
+		base + "&hostname=https://example.com",
+		base + "&path=health",
+		base + "&port=70000",
+		base + "&attempts=11",
+		base + "&timeout_ms=100",
+		base + "&time_range=all",
+	}
+	for _, path := range paths {
+		request := httptest.NewRequest("GET", path, nil)
+		if _, err := trendFilterFromRequest(request); err == nil {
+			t.Fatalf("expected %s to fail", path)
+		}
+	}
+}

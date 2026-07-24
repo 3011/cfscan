@@ -41,23 +41,28 @@ export function ScanConfigurationFields({
           <FormField control={form.control} name="sampling_mode" render={({ field }) => (
             <FormItem>
               <FormLabel>扫描范围</FormLabel>
-              <Select items={{ count: '按数量采样', one_per_prefix: '每个前缀取 1 个 IP' }} value={field.value} onValueChange={field.onChange}>
+              <Select items={{ count: '按数量采样', one_per_prefix: '每个前缀取 1 个 IP', league: '智能筛选最佳 IP' }} value={field.value} onValueChange={field.onChange}>
                 <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                 <SelectContent>
                   <SelectItem value="count">按数量采样</SelectItem>
                   <SelectItem value="one_per_prefix">每个前缀取 1 个 IP</SelectItem>
+                  <SelectItem value="league">智能筛选最佳 IP</SelectItem>
                 </SelectContent>
               </Select>
-              <FormDescription>{field.value === 'one_per_prefix' ? `覆盖全部启用 CIDR${overview.data ? `（当前来源共 ${overview.data.prefixes_total} 条，IPv6 开关会影响实际数量）` : ''}。` : '从全部启用前缀中轮询抽取指定数量。'}</FormDescription>
+              <FormDescription>{field.value === 'one_per_prefix'
+                ? `覆盖全部启用 CIDR${overview.data ? `（当前来源共 ${overview.data.prefixes_total} 条，IPv6 开关会影响实际数量）` : ''}。`
+                : field.value === 'league'
+                  ? '按 Agent 独立维护冠军、挑战与观察层，优先深挖优质前缀并固定复测候选 IP。'
+                  : '从全部启用前缀中轮询抽取指定数量。'}</FormDescription>
               <FormMessage />
             </FormItem>
           )} />
-          {samplingMode === 'count' ? (
+          {samplingMode !== 'one_per_prefix' ? (
             <FormField control={form.control} name="target_count" render={({ field }) => (
               <FormItem>
-                <FormLabel>采样 IP 数量</FormLabel>
+                <FormLabel>{samplingMode === 'league' ? '单 Agent 单轮预算' : '采样 IP 数量'}</FormLabel>
                 <FormControl><Input type="number" min={1} max={10_000} value={field.value} onChange={(event) => field.onChange(event.target.valueAsNumber)} onBlur={field.onBlur} name={field.name} ref={field.ref} /></FormControl>
-                <FormDescription>每个所选 Agent 都会扫描这一批目标。</FormDescription>
+                <FormDescription>{samplingMode === 'league' ? '作为每个 Agent 每轮的目标上限；未轮到的观察前缀会在后续轮次继续获得机会。' : '每个所选 Agent 都会扫描这一批目标。'}</FormDescription>
                 <FormMessage />
               </FormItem>
             )} />

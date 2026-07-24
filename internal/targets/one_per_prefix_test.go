@@ -27,15 +27,15 @@ func TestOnePerPrefixReservesAddressesForSpecificPrefixes(t *testing.T) {
 		netip.MustParsePrefix("104.16.0.0/24"),
 	}
 	for index, value := range items {
-		if seen[value] {
-			t.Fatalf("duplicate target %s", value)
+		if seen[value.TargetIP] {
+			t.Fatalf("duplicate target %s", value.TargetIP)
 		}
-		seen[value] = true
-		if !ordered[index].Contains(netip.MustParseAddr(value)) {
-			t.Fatalf("target %s is outside expected prefix %s", value, ordered[index])
+		seen[value.TargetIP] = true
+		if !ordered[index].Contains(netip.MustParseAddr(value.TargetIP)) {
+			t.Fatalf("target %s is outside expected prefix %s", value.TargetIP, ordered[index])
 		}
 	}
-	if items[0] != "104.16.0.0" {
+	if items[0].TargetIP != "104.16.0.0" {
 		t.Fatalf("most specific /32 was not reserved: %v", items)
 	}
 }
@@ -49,7 +49,7 @@ func TestOnePerPrefixHonorsIPv6Flag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(v4Only) != 1 || !netip.MustParseAddr(v4Only[0]).Is4() {
+	if len(v4Only) != 1 || !netip.MustParseAddr(v4Only[0].TargetIP).Is4() {
 		t.Fatalf("unexpected IPv4-only targets: %v", v4Only)
 	}
 	all, err := OnePerPrefix(prefixes, true, "dual-stack")

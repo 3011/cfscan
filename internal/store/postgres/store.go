@@ -440,31 +440,14 @@ func scanASNSource(row rowScanner, item *model.ASNSource) error {
 		&item.LastSyncedAt, &item.LastError, &item.CreatedAt, &item.UpdatedAt)
 }
 
-func (s *Store) CreateScanJob(ctx context.Context, input model.CreateScanJobRequest, targets []string) (model.ScanJob, error) {
+func (s *Store) CreateScanJob(ctx context.Context, input model.CreateScanJobRequest, agentTargets []model.AgentScanTargets) (model.ScanJob, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return model.ScanJob{}, fmt.Errorf("begin create job: %w", err)
 	}
 	defer tx.Rollback(ctx)
-
-	agentIDs := input.AgentIDs
-	if len(agentIDs) == 0 {
-		rows, err := tx.Query(ctx, `SELECT id::text FROM agents WHERE last_seen_at >= NOW() - INTERVAL '45 seconds' ORDER BY name`)
-		if err != nil {
-			return model.ScanJob{}, err
-		}
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				rows.Close()
-				return model.ScanJob{}, err
-			}
-			agentIDs = append(agentIDs, id)
-		}
-		rows.Close()
-	}
-	if len(agentIDs) == 0 {
-		return model.ScanJob{}, fmt.Errorf("no online agents selected")
+	if len(agentTargets) == 0 {
+		return model.ScanJob{}, fmt.Errorf("no scan agents selected")
 	}
 
 	var job model.ScanJob
@@ -476,32 +459,49 @@ RETURNING id::text, name, kind, status, sampling_mode, scheme, hostname, path, p
     max_latency_ms, max_packet_loss, blacklist_minutes, total_targets, completed_targets,
     success_targets, failed_targets, created_at, started_at, finished_at`,
 		input.Name, input.Kind, input.SamplingMode, input.Scheme, input.Hostname, input.Path, input.Port, input.Attempts, input.TimeoutMS,
-		input.MaxLatencyMS, input.MaxPacketLoss, input.BlacklistMinutes,
-	)
-	err = jobRow{row}.ScanJob(&job)
-	if err != nil {
+		input.MaxLatencyMS, input.MaxPacketLoss, input.BlacklistMinutes)
+	if err := (jobRow{row}).ScanJob(&job); err != nil {
 		return model.ScanJob{}, fmt.Errorf("insert scan job: %w", err)
 	}
 
+	type scheduledPrefix struct {
+		agentID string
+		prefix  string
+	}
 	inserted := 0
-	for _, target := range targets {
-		if _, err := tx.Exec(ctx, `INSERT INTO ip_targets (ip, source, enabled, updated_at) VALUES ($1::inet, 'cloudflare_union', TRUE, NOW()) ON CONFLICT (ip) DO UPDATE SET enabled = TRUE, updated_at = NOW()`, target); err != nil {
-			return model.ScanJob{}, fmt.Errorf("upsert target %s: %w", target, err)
+	scheduledPrefixes := make(map[string]scheduledPrefix)
+	for _, agentSet := range agentTargets {
+		if agentSet.AgentID == "" {
+			return model.ScanJob{}, fmt.Errorf("scan target set is missing agent_id")
 		}
-		for _, agentID := range agentIDs {
-			query := `
-INSERT INTO scan_tasks (job_id, preferred_agent_id, target_ip)
-SELECT $1::uuid, $2::uuid, $3::inet
-WHERE $4 OR NOT EXISTS (
+		for _, target := range agentSet.Targets {
+			if target.TargetIP == "" {
+				continue
+			}
+			if _, err := tx.Exec(ctx, `
+INSERT INTO ip_targets (ip, source, enabled, updated_at)
+VALUES ($1::inet, 'cloudflare_union', TRUE, NOW())
+ON CONFLICT (ip) DO UPDATE SET enabled = TRUE, updated_at = NOW()`, target.TargetIP); err != nil {
+				return model.ScanJob{}, fmt.Errorf("upsert target %s: %w", target.TargetIP, err)
+			}
+			tag, err := tx.Exec(ctx, `
+INSERT INTO scan_tasks (job_id, preferred_agent_id, target_ip, target_prefix)
+SELECT $1::uuid, $2::uuid, $3::inet, NULLIF($4::text, '')::cidr
+WHERE $5 OR NOT EXISTS (
     SELECT 1 FROM blacklist_entries b
     WHERE b.agent_id = $2::uuid AND b.target_ip = $3::inet AND b.retry_after > NOW()
 )
-ON CONFLICT DO NOTHING`
-			tag, err := tx.Exec(ctx, query, job.ID, agentID, target, input.IncludeBlocked)
+ON CONFLICT DO NOTHING`, job.ID, agentSet.AgentID, target.TargetIP, target.PrefixCIDR, input.IncludeBlocked)
 			if err != nil {
 				return model.ScanJob{}, fmt.Errorf("insert scan task: %w", err)
 			}
-			inserted += int(tag.RowsAffected())
+			if tag.RowsAffected() == 0 {
+				continue
+			}
+			inserted++
+			if input.SamplingMode == "league" && target.PrefixCIDR != "" {
+				scheduledPrefixes[agentSet.AgentID+"|"+target.PrefixCIDR] = scheduledPrefix{agentID: agentSet.AgentID, prefix: target.PrefixCIDR}
+			}
 		}
 	}
 	if inserted == 0 {
@@ -509,6 +509,16 @@ ON CONFLICT DO NOTHING`
 	}
 	if _, err := tx.Exec(ctx, `UPDATE scan_jobs SET total_targets = $2 WHERE id = $1`, job.ID, inserted); err != nil {
 		return model.ScanJob{}, err
+	}
+	for _, selected := range scheduledPrefixes {
+		if _, err := tx.Exec(ctx, `
+UPDATE prefix_league_entries SET last_scheduled_at = NOW(), updated_at = NOW()
+WHERE agent_id = $1::uuid AND prefix_cidr = $2::cidr AND scheme = $3 AND hostname = $4
+  AND path = $5 AND port = $6 AND attempts = $7 AND timeout_ms = $8`,
+			selected.agentID, selected.prefix, input.Scheme, input.Hostname, input.Path,
+			input.Port, input.Attempts, input.TimeoutMS); err != nil {
+			return model.ScanJob{}, fmt.Errorf("mark league prefix scheduled: %w", err)
+		}
 	}
 	job.TotalTargets = inserted
 	if err := tx.Commit(ctx); err != nil {
@@ -801,21 +811,26 @@ func (s *Store) SubmitResults(ctx context.Context, batch model.ResultBatch) erro
 		return tx.Commit(ctx)
 	}
 	for _, result := range batch.Results {
-		tag, err := tx.Exec(ctx, `
+		var taskTarget, taskPrefix string
+		err := tx.QueryRow(ctx, `
 UPDATE scan_tasks SET status = 'completed', lease_until = NULL, completed_at = NOW()
-WHERE id = $1 AND job_id = $2 AND preferred_agent_id = $3 AND status = 'leased'`, result.TaskID, batch.JobID, batch.AgentID)
+WHERE id = $1 AND job_id = $2 AND preferred_agent_id = $3 AND status = 'leased'
+RETURNING host(target_ip), COALESCE(target_prefix::text, '')`, result.TaskID, batch.JobID, batch.AgentID).Scan(&taskTarget, &taskPrefix)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("task %d does not belong to job or agent", result.TaskID)
+		}
 		if err != nil {
 			return fmt.Errorf("complete task %d: %w", result.TaskID, err)
 		}
-		if tag.RowsAffected() == 0 {
-			return fmt.Errorf("task %d does not belong to job or agent", result.TaskID)
+		if result.TargetIP != taskTarget {
+			return fmt.Errorf("task %d target mismatch", result.TaskID)
 		}
 		_, err = tx.Exec(ctx, `
-INSERT INTO scan_results (job_id, task_id, agent_id, target_ip, available, latency_ms, packet_loss,
+INSERT INTO scan_results (job_id, task_id, agent_id, target_ip, target_prefix, available, latency_ms, packet_loss,
     tcp_connect_ms, tls_handshake_ms, ttfb_ms, total_ms, http_status, http_version, tls_version,
     colo, cf_ray, error_code, error_message, successful_tries, attempts, scanned_at)
-VALUES ($1, $2, $3, $4::inet, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
-ON CONFLICT (task_id) DO UPDATE SET available = EXCLUDED.available, latency_ms = EXCLUDED.latency_ms,
+VALUES ($1, $2, $3, $4::inet, NULLIF($5::text, '')::cidr, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, NOW())
+ON CONFLICT (task_id) DO UPDATE SET target_prefix = EXCLUDED.target_prefix, available = EXCLUDED.available, latency_ms = EXCLUDED.latency_ms,
     packet_loss = EXCLUDED.packet_loss, tcp_connect_ms = EXCLUDED.tcp_connect_ms,
     tls_handshake_ms = EXCLUDED.tls_handshake_ms, ttfb_ms = EXCLUDED.ttfb_ms,
     total_ms = EXCLUDED.total_ms, http_status = EXCLUDED.http_status,
@@ -823,7 +838,7 @@ ON CONFLICT (task_id) DO UPDATE SET available = EXCLUDED.available, latency_ms =
     colo = EXCLUDED.colo, cf_ray = EXCLUDED.cf_ray, error_code = EXCLUDED.error_code,
     error_message = EXCLUDED.error_message, successful_tries = EXCLUDED.successful_tries,
     attempts = EXCLUDED.attempts, scanned_at = NOW()`,
-			batch.JobID, result.TaskID, batch.AgentID, result.TargetIP, result.Available,
+			batch.JobID, result.TaskID, batch.AgentID, taskTarget, taskPrefix, result.Available,
 			result.LatencyMS, result.PacketLoss, result.TCPConnectMS, result.TLSHandshakeMS,
 			result.TTFBMS, result.TotalMS, result.HTTPStatus, result.HTTPVersion, result.TLSVersion,
 			result.Colo, result.CFRay, result.ErrorCode, truncate(result.ErrorMessage, 1000),
@@ -851,9 +866,9 @@ INSERT INTO blacklist_entries (agent_id, target_ip, reason, failure_count, block
 VALUES ($1, $2::inet, $3, 1, NOW(), NOW() + ($4 * INTERVAL '1 minute'), NOW())
 ON CONFLICT (agent_id, target_ip) DO UPDATE SET reason = EXCLUDED.reason,
     failure_count = blacklist_entries.failure_count + 1, blocked_at = NOW(),
-    retry_after = NOW() + ($4 * INTERVAL '1 minute'), updated_at = NOW()`, batch.AgentID, result.TargetIP, reason, blacklistMinutes)
+    retry_after = NOW() + ($4 * INTERVAL '1 minute'), updated_at = NOW()`, batch.AgentID, taskTarget, reason, blacklistMinutes)
 		} else {
-			_, err = tx.Exec(ctx, `DELETE FROM blacklist_entries WHERE agent_id = $1 AND target_ip = $2::inet`, batch.AgentID, result.TargetIP)
+			_, err = tx.Exec(ctx, `DELETE FROM blacklist_entries WHERE agent_id = $1 AND target_ip = $2::inet`, batch.AgentID, taskTarget)
 		}
 		if err != nil {
 			return fmt.Errorf("update blacklist: %w", err)

@@ -199,6 +199,7 @@ type ASNSyncSummary struct {
 
 type CreateScanJobRequest struct {
 	Kind             string   `json:"-"`
+	ForceLeague      bool     `json:"-"`
 	Name             string   `json:"name"`
 	AgentIDs         []string `json:"agent_ids"`
 	SamplingMode     string   `json:"sampling_mode"`
@@ -214,6 +215,16 @@ type CreateScanJobRequest struct {
 	BlacklistMinutes int      `json:"blacklist_minutes"`
 	IncludeIPv6      bool     `json:"include_ipv6"`
 	IncludeBlocked   bool     `json:"include_blocked"`
+}
+
+type ScanTarget struct {
+	TargetIP   string `json:"target_ip"`
+	PrefixCIDR string `json:"prefix_cidr,omitempty"`
+}
+
+type AgentScanTargets struct {
+	AgentID string       `json:"agent_id"`
+	Targets []ScanTarget `json:"targets"`
 }
 
 type ScanJob struct {
@@ -381,6 +392,111 @@ type ResultJobFacet struct {
 	Kind      string    `json:"kind"`
 	Count     int       `json:"count"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type PrefixLeagueEntry struct {
+	AgentID                string     `json:"agent_id"`
+	AgentName              string     `json:"agent_name"`
+	Region                 string     `json:"region"`
+	Continent              string     `json:"continent"`
+	PrefixCIDR             string     `json:"prefix_cidr"`
+	Scheme                 string     `json:"scheme"`
+	Hostname               string     `json:"hostname"`
+	Path                   string     `json:"path"`
+	Port                   int        `json:"port"`
+	Attempts               int        `json:"attempts"`
+	TimeoutMS              int        `json:"timeout_ms"`
+	Tier                   string     `json:"tier"`
+	Active                 bool       `json:"active"`
+	SampleCount            int        `json:"sample_count"`
+	DistinctIPCount        int        `json:"distinct_ip_count"`
+	AvailabilityRate       float64    `json:"availability_rate"`
+	LatencyP95MS           float64    `json:"latency_p95_ms"`
+	PacketLossAvg          float64    `json:"packet_loss_avg"`
+	RecentSampleCount      int        `json:"recent_sample_count"`
+	RecentAvailabilityRate float64    `json:"recent_availability_rate"`
+	RecentLatencyP95MS     float64    `json:"recent_latency_p95_ms"`
+	RecentPacketLossAvg    float64    `json:"recent_packet_loss_avg"`
+	BadStreak              int        `json:"bad_streak"`
+	LastResultAt           *time.Time `json:"last_result_at,omitempty"`
+	LastScheduledAt        *time.Time `json:"last_scheduled_at,omitempty"`
+	LastEvaluatedAt        *time.Time `json:"last_evaluated_at,omitempty"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+}
+
+type LeagueCandidate struct {
+	AgentID          string    `json:"agent_id"`
+	AgentName        string    `json:"agent_name"`
+	Region           string    `json:"region"`
+	Continent        string    `json:"continent"`
+	PrefixCIDR       string    `json:"prefix_cidr"`
+	Tier             string    `json:"tier"`
+	Scheme           string    `json:"scheme"`
+	Hostname         string    `json:"hostname"`
+	Path             string    `json:"path"`
+	Port             int       `json:"port"`
+	Attempts         int       `json:"attempts"`
+	TimeoutMS        int       `json:"timeout_ms"`
+	TargetIP         string    `json:"target_ip"`
+	Colo             string    `json:"colo"`
+	SampleCount      int       `json:"sample_count"`
+	AvailabilityRate float64   `json:"availability_rate"`
+	LatencyP95MS     float64   `json:"latency_p95_ms"`
+	PacketLossAvg    float64   `json:"packet_loss_avg"`
+	LastScannedAt    time.Time `json:"last_scanned_at"`
+}
+
+type IPTrendFilter struct {
+	AgentID   string
+	TargetIP  string
+	Scheme    string
+	Hostname  string
+	Path      string
+	Port      int
+	Attempts  int
+	TimeoutMS int
+	Since     time.Time
+}
+
+type IPTrendSummary struct {
+	SampleCount      int     `json:"sample_count"`
+	AvailabilityRate float64 `json:"availability_rate"`
+	LatencyP50MS     float64 `json:"latency_p50_ms"`
+	LatencyP95MS     float64 `json:"latency_p95_ms"`
+	PacketLossAvg    float64 `json:"packet_loss_avg"`
+	LatestColo       string  `json:"latest_colo"`
+}
+
+type IPTrendPoint struct {
+	ScannedAt      time.Time `json:"scanned_at"`
+	Available      bool      `json:"available"`
+	LatencyMS      float64   `json:"latency_ms"`
+	PacketLoss     float64   `json:"packet_loss"`
+	TCPConnectMS   float64   `json:"tcp_connect_ms"`
+	TLSHandshakeMS float64   `json:"tls_handshake_ms"`
+	TTFBMS         float64   `json:"ttfb_ms"`
+	Colo           string    `json:"colo"`
+}
+
+type IPTrend struct {
+	AgentID   string         `json:"agent_id"`
+	AgentName string         `json:"agent_name"`
+	TargetIP  string         `json:"target_ip"`
+	Summary   IPTrendSummary `json:"summary"`
+	Points    []IPTrendPoint `json:"points"`
+}
+
+type LeagueSummary struct {
+	ObservationPrefixes int `json:"observation_prefixes"`
+	ChallengerPrefixes  int `json:"challenger_prefixes"`
+	ChampionPrefixes    int `json:"champion_prefixes"`
+	CandidateIPs        int `json:"candidate_ips"`
+}
+
+type LeagueDashboard struct {
+	Summary    LeagueSummary       `json:"summary"`
+	Prefixes   []PrefixLeagueEntry `json:"prefixes"`
+	Candidates []LeagueCandidate   `json:"candidates"`
 }
 
 type BlacklistEntry struct {

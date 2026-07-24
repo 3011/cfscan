@@ -4,6 +4,12 @@ All notable public changes are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added per-Agent adaptive prefix leagues with observation, challenger, and champion tiers, diversified promotion evidence, hysteresis-based demotion, and bounded target budgets.
+- Added fixed candidate-IP retesting and a Best IP console with Agent-scoped candidate rankings plus 24-hour, 7-day, and 30-day latency and packet-loss trends.
+- Persisted the exact source prefix on scan tasks and results so overlapping CIDRs remain attributable without changing the Agent protocol.
+
 ## [2.1.1] - 2026-07-20
 
 ### Fixed

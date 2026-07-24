@@ -23,7 +23,7 @@ export function AutomationOverview() {
   const upcoming: Upcoming[] = [
     ...(schedules.data?.items ?? []).map((item) => ({
       key: item.id, name: item.name, type: '扫描计划', next: item.next_run_at, timezone: item.timezone,
-      detail: item.sampling_mode === 'one_per_prefix' ? '每个启用前缀取 1 个 IP' : `${item.target_count} 个 IP`, enabled: item.enabled,
+      detail: item.sampling_mode === 'one_per_prefix' ? '每个启用前缀取 1 个 IP' : item.sampling_mode === 'league' ? `联赛预算 ${item.target_count} 个 IP / Agent` : `${item.target_count} 个 IP`, enabled: item.enabled,
     })),
     blacklist.data ? {
       key: 'blacklist', name: '黑名单复查', type: '恢复策略', next: blacklist.data.next_run_at, timezone: blacklist.data.timezone,

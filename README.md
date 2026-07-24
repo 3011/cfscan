@@ -19,6 +19,7 @@ CF Scanner coordinates lightweight regional Agents from a central Go service. Ag
 
 - distributed outbound-only Agents with browser-approved pairing and per-Agent credentials;
 - Cloudflare official and ASN prefix sources;
+- adaptive per-Agent prefix leagues, candidate-IP retesting, and per-IP latency/loss trends;
 - latest-result ranking and complete history;
 - server-side filters, sorting, pagination, and geographic facets;
 - configurable scan schedules and source synchronization;
@@ -63,6 +64,12 @@ Single HTTPS origin / Ingress
 ```
 
 See [`docs/architecture.md`](docs/architecture.md) for task leases, result semantics, automation, authentication boundaries, and database behavior. Agent pairing and migration are documented in [`docs/agent-enrollment.md`](docs/agent-enrollment.md).
+
+## Adaptive best-IP selection
+
+Scan jobs can use an adaptive `league` sampling mode. Each Agent evaluates prefixes independently because Cloudflare Anycast paths differ by source network. Prefixes move between observation, challenger, and champion tiers based on diversified seven-day samples and clear recent degradation. Champion prefixes receive more exploration budget, while strong candidate IPs are kept as fixed anchors for repeated verification.
+
+The **Best IP** console page shows tier state, candidate rankings, and a per-IP detail view with separate latency and packet-loss trends. Probe configurations are never mixed: Agent, IP, scheme, hostname, path, port, attempts, and timeout remain part of the measurement identity.
 
 ## Container images
 

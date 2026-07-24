@@ -27,3 +27,19 @@ it('每前缀模式不依赖用户填写的采样数量', () => {
   })
   expect(result.success).toBe(true)
 })
+
+
+it('联赛模式要求有效的单 Agent 扫描预算', () => {
+  expect(createScanJobSchema.safeParse({
+    ...defaultScanJobValues,
+    name: '最佳 IP 联赛',
+    sampling_mode: 'league',
+    target_count: 256,
+  }).success).toBe(true)
+  expect(createScanJobSchema.safeParse({
+    ...defaultScanJobValues,
+    name: '无效联赛预算',
+    sampling_mode: 'league',
+    target_count: 0,
+  }).success).toBe(false)
+})

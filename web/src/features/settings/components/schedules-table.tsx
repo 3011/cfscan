@@ -103,7 +103,7 @@ export function SchedulesTable({ schedules, onEdit, canManage }: { schedules: Sc
       accessorKey: 'target_count',
       meta: { label: '扫描规模' },
       header: ({ column }) => <DataTableColumnHeader column={column} title="扫描规模" />,
-      cell: ({ row }) => <div><p>{row.original.sampling_mode === 'one_per_prefix' ? '每前缀 1 个 IP' : `${row.original.target_count} 个 IP`}</p><p className="mt-1 text-xs text-muted-foreground">{row.original.agent_ids.length || '全部在线'} Agent</p></div>,
+      cell: ({ row }) => <div><p>{row.original.sampling_mode === 'one_per_prefix' ? '每前缀 1 个 IP' : row.original.sampling_mode === 'league' ? `联赛预算 ${row.original.target_count}` : `${row.original.target_count} 个 IP`}</p><p className="mt-1 text-xs text-muted-foreground">{row.original.agent_ids.length || '全部在线'} Agent</p></div>,
     },
     {
       accessorKey: 'next_run_at',
@@ -164,7 +164,7 @@ export function SchedulesTable({ schedules, onEdit, canManage }: { schedules: Sc
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><p className="text-xs text-muted-foreground">频率</p><p className="mt-1">{cronLabels[item.cron_expression] ?? '自定义'}</p></div>
                 <div><p className="text-xs text-muted-foreground">下次执行</p><p className="mt-1">{formatDateInTimezone(item.next_run_at, item.timezone)}</p></div>
-                <div><p className="text-xs text-muted-foreground">扫描规模</p><p className="mt-1">{item.sampling_mode === 'one_per_prefix' ? '每前缀 1 IP' : `${item.target_count} IP`}</p></div>
+                <div><p className="text-xs text-muted-foreground">扫描规模</p><p className="mt-1">{item.sampling_mode === 'one_per_prefix' ? '每前缀 1 IP' : item.sampling_mode === 'league' ? `联赛预算 ${item.target_count}` : `${item.target_count} IP`}</p></div>
                 <div><p className="text-xs text-muted-foreground">Agent</p><p className="mt-1">{item.agent_ids.length || '全部在线'}</p></div>
               </div>
               {item.last_error ? <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">{item.last_error}</p> : null}

@@ -2,12 +2,14 @@ package api
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -76,8 +78,10 @@ func New(dataStore store.Store, syncer *cloudflare.Syncer, automationService *au
 			r.Get("/jobs/{jobID}", api.getJob)
 			r.Get("/schedules", api.listSchedules)
 			r.Get("/results", api.listResults)
+			r.Get("/results/trend", api.getIPTrend)
 			r.Get("/results/facets", api.listResultFacets)
 			r.Get("/results/jobs", api.listResultJobs)
+			r.Get("/league", api.getLeagueDashboard)
 			r.Get("/colos", api.listColos)
 			r.Get("/blacklist", api.listBlacklist)
 			r.Get("/automation/blacklist-recheck", api.getBlacklistRecheckSettings)
@@ -347,7 +351,9 @@ func (a *API) runScheduleNow(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := contextWithTimeout(r, 5*time.Minute)
 	defer cancel()
-	job, runErr := a.scanService.Create(ctx, item.JobRequest(), "scheduled")
+	jobRequest := item.JobRequest()
+	jobRequest.ForceLeague = true
+	job, runErr := a.scanService.Create(ctx, jobRequest, "scheduled")
 	var jobID *string
 	summary := json.RawMessage(`{}`)
 	if runErr == nil {
@@ -521,6 +527,123 @@ func (a *API) listResultJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func validUUID(value string) bool {
+	if len(value) != 36 || value[8] != '-' || value[13] != '-' || value[18] != '-' || value[23] != '-' {
+		return false
+	}
+	compact := strings.ReplaceAll(value, "-", "")
+	_, err := hex.DecodeString(compact)
+	return err == nil
+}
+
+func boundedQueryInt(r *http.Request, name string, fallback, minimum, maximum int) (int, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get(name))
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < minimum || value > maximum {
+		return 0, fmt.Errorf("%s must be between %d and %d", name, minimum, maximum)
+	}
+	return value, nil
+}
+
+func trendFilterFromRequest(r *http.Request) (model.IPTrendFilter, error) {
+	agentID := strings.TrimSpace(r.URL.Query().Get("agent_id"))
+	targetIP := strings.TrimSpace(r.URL.Query().Get("target_ip"))
+	if !validUUID(agentID) {
+		return model.IPTrendFilter{}, fmt.Errorf("agent_id must be a valid UUID")
+	}
+	if _, err := netip.ParseAddr(targetIP); err != nil {
+		return model.IPTrendFilter{}, fmt.Errorf("target_ip must be a valid IP address")
+	}
+
+	now := time.Now().UTC()
+	since := now.Add(-7 * 24 * time.Hour)
+	switch strings.TrimSpace(r.URL.Query().Get("time_range")) {
+	case "", "7d":
+	case "24h":
+		since = now.Add(-24 * time.Hour)
+	case "30d":
+		since = now.Add(-30 * 24 * time.Hour)
+	default:
+		return model.IPTrendFilter{}, fmt.Errorf("time_range must be 24h, 7d, or 30d")
+	}
+
+	filter := model.IPTrendFilter{
+		AgentID: agentID, TargetIP: targetIP, Since: since,
+		Scheme:   strings.TrimSpace(r.URL.Query().Get("scheme")),
+		Hostname: strings.TrimSpace(r.URL.Query().Get("hostname")),
+		Path:     strings.TrimSpace(r.URL.Query().Get("path")),
+	}
+	if filter.Scheme == "" {
+		filter.Scheme = "https"
+	}
+	if filter.Scheme != "http" && filter.Scheme != "https" {
+		return model.IPTrendFilter{}, fmt.Errorf("scheme must be http or https")
+	}
+	if filter.Hostname == "" {
+		filter.Hostname = "cloudflare.com"
+	}
+	if strings.ContainsAny(filter.Hostname, " /\\") {
+		return model.IPTrendFilter{}, fmt.Errorf("hostname is invalid")
+	}
+	if filter.Path == "" {
+		filter.Path = "/cdn-cgi/trace"
+	}
+	if !strings.HasPrefix(filter.Path, "/") {
+		return model.IPTrendFilter{}, fmt.Errorf("path must start with /")
+	}
+
+	var err error
+	if filter.Port, err = boundedQueryInt(r, "port", 443, 1, 65535); err != nil {
+		return model.IPTrendFilter{}, err
+	}
+	if filter.Attempts, err = boundedQueryInt(r, "attempts", 3, 1, 10); err != nil {
+		return model.IPTrendFilter{}, err
+	}
+	if filter.TimeoutMS, err = boundedQueryInt(r, "timeout_ms", 5000, 500, 30000); err != nil {
+		return model.IPTrendFilter{}, err
+	}
+	return filter, nil
+}
+
+func (a *API) getIPTrend(w http.ResponseWriter, r *http.Request) {
+	filter, err := trendFilterFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	item, err := a.store.GetIPTrend(r.Context(), filter)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found", "Agent not found")
+		return
+	}
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+func (a *API) getLeagueDashboard(w http.ResponseWriter, r *http.Request) {
+	agentID := strings.TrimSpace(r.URL.Query().Get("agent_id"))
+	if agentID != "" && !validUUID(agentID) {
+		writeError(w, http.StatusBadRequest, "invalid_request", "agent_id must be a valid UUID")
+		return
+	}
+	item, err := a.store.GetLeagueDashboard(
+		r.Context(),
+		agentID,
+		queryInt(r, "limit", 500),
+	)
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
 }
 
 func (a *API) listBlacklist(w http.ResponseWriter, r *http.Request) {

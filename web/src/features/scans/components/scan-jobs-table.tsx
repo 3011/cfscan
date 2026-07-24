@@ -71,7 +71,7 @@ export function ScanJobsTable({ jobs }: { jobs: ScanJob[] }) {
       accessorKey: 'kind',
       meta: { label: '类型' },
       header: '类型',
-      cell: ({ row }) => <div className="flex flex-wrap gap-1"><Badge variant="secondary">{row.original.kind === 'blacklist_recheck' ? '黑名单复检' : row.original.kind === 'scheduled' ? '定时扫描' : '常规扫描'}</Badge>{row.original.sampling_mode === 'one_per_prefix' ? <Badge variant="outline">每前缀 1 IP</Badge> : null}</div>,
+      cell: ({ row }) => <div className="flex flex-wrap gap-1"><Badge variant="secondary">{row.original.kind === 'blacklist_recheck' ? '黑名单复检' : row.original.kind === 'scheduled' ? '定时扫描' : '常规扫描'}</Badge>{row.original.sampling_mode === 'one_per_prefix' ? <Badge variant="outline">每前缀 1 IP</Badge> : row.original.sampling_mode === 'league' ? <Badge variant="outline">最佳 IP 联赛</Badge> : null}</div>,
       filterFn: 'equalsString',
     },
     {

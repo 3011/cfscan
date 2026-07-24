@@ -95,6 +95,7 @@ const routes = [
   ['/', '运行总览'],
   ['/jobs', '扫描任务'],
   ['/results', '结果排行'],
+  ['/league', '最佳 IP 联赛'],
   ['/sources', 'IP 数据源'],
   ['/blacklist', '黑名单'],
   ['/agents', 'Agent 节点'],

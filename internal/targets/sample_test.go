@@ -19,13 +19,13 @@ func TestSampleDistributesAndStaysInsidePrefixes(t *testing.T) {
 	seen := map[string]bool{}
 	parsed := []netip.Prefix{netip.MustParsePrefix(prefixes[0].CIDR), netip.MustParsePrefix(prefixes[1].CIDR)}
 	for _, value := range items {
-		if seen[value] {
-			t.Fatalf("duplicate target %s", value)
+		if seen[value.TargetIP] {
+			t.Fatalf("duplicate target %s", value.TargetIP)
 		}
-		seen[value] = true
-		addr := netip.MustParseAddr(value)
+		seen[value.TargetIP] = true
+		addr := netip.MustParseAddr(value.TargetIP)
 		if !parsed[0].Contains(addr) && !parsed[1].Contains(addr) {
-			t.Fatalf("target outside prefixes: %s", value)
+			t.Fatalf("target outside prefixes: %s", value.TargetIP)
 		}
 	}
 }

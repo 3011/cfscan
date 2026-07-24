@@ -3,7 +3,7 @@ export interface ScanJob {
   name: string
   kind: string
   status: string
-  sampling_mode: 'count' | 'one_per_prefix'
+  sampling_mode: 'count' | 'one_per_prefix' | 'league'
   scheme: string
   hostname: string
   path: string
@@ -26,7 +26,7 @@ export interface ScanJob {
 export interface CreateScanJob {
   name: string
   agent_ids: string[]
-  sampling_mode: 'count' | 'one_per_prefix'
+  sampling_mode: 'count' | 'one_per_prefix' | 'league'
   target_count: number
   scheme: 'http' | 'https'
   hostname: string

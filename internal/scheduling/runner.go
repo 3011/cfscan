@@ -3,10 +3,12 @@ package scheduling
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/3011/cfscan/v2/internal/model"
+	"github.com/3011/cfscan/v2/internal/scans"
 )
 
 type RunnerStore interface {
@@ -59,15 +61,23 @@ func (r *Runner) RunDue(ctx context.Context) (int, error) {
 		cancel()
 		var jobID *string
 		summary := json.RawMessage(`{}`)
+		status := "completed"
+		recordErr := runErr
 		if runErr == nil {
 			jobID = &job.ID
 			summary, _ = json.Marshal(map[string]any{"job_id": job.ID, "tasks": job.TotalTargets})
 			r.logger.Info("scheduled scan job created", "schedule_id", item.ID, "job_id", job.ID, "next_run_at", nextRun)
+		} else if errors.Is(runErr, scans.ErrNoLeagueTargetsDue) {
+			status = "skipped"
+			recordErr = nil
+			summary, _ = json.Marshal(map[string]any{"reason": "当前没有到期的联赛前缀"})
+			r.logger.Info("scheduled league scan skipped", "schedule_id", item.ID, "next_run_at", nextRun)
 		} else {
+			status = "failed"
 			r.logger.Warn("scheduled scan job failed", "schedule_id", item.ID, "error", runErr, "next_run_at", nextRun)
 		}
-		_ = r.store.FinishAutomationRun(ctx, automationRun.ID, "completed", summary, runErr)
-		if err := r.store.RecordScanScheduleRun(ctx, item.ID, &nextRun, jobID, runErr); err != nil {
+		_ = r.store.FinishAutomationRun(ctx, automationRun.ID, status, summary, recordErr)
+		if err := r.store.RecordScanScheduleRun(ctx, item.ID, &nextRun, jobID, recordErr); err != nil {
 			r.logger.Error("record scheduled scan result", "schedule_id", item.ID, "error", err)
 		}
 	}

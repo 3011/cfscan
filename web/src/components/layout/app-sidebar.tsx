@@ -1,4 +1,4 @@
-import { Activity, Ban, Bot, ChevronsUpDown, Cloud, CloudCog, Gauge, ListChecks, LogOut, Settings, UserRound, Users } from 'lucide-react'
+import { Activity, Ban, Bot, ChevronsUpDown, Cloud, CloudCog, Gauge, ListChecks, LogOut, Trophy, Settings, UserRound, Users } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/auth-context'
 import {
@@ -26,6 +26,7 @@ const groups = [
     items: [
       { to: '/jobs', label: '扫描任务', icon: ListChecks },
       { to: '/results', label: '结果排行', icon: Activity },
+      { to: '/league', label: '最佳 IP', icon: Trophy },
       { to: '/blacklist', label: '黑名单', icon: Ban },
     ],
   },

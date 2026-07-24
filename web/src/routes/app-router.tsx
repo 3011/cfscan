@@ -8,6 +8,8 @@ const DashboardPage = lazy(() => import('@/features/dashboard/dashboard-page').t
 const SourcesPage = lazy(() => import('@/features/sources/sources-page').then((module) => ({ default: module.SourcesPage })))
 const ScansPage = lazy(() => import('@/features/scans/scans-page').then((module) => ({ default: module.ScansPage })))
 const ResultsPage = lazy(() => import('@/features/results/results-page').then((module) => ({ default: module.ResultsPage })))
+const LeaguePage = lazy(() => import('@/features/league/league-page').then((module) => ({ default: module.LeaguePage })))
+const IPTrendPage = lazy(() => import('@/features/league/ip-trend-page').then((module) => ({ default: module.IPTrendPage })))
 const BlacklistPage = lazy(() => import('@/features/blacklist/blacklist-page').then((module) => ({ default: module.BlacklistPage })))
 const AgentsPage = lazy(() => import('@/features/agents/agents-page').then((module) => ({ default: module.AgentsPage })))
 const EnrollmentApprovalPage = lazy(() => import('@/features/agents/enrollment-approval-page').then((module) => ({ default: module.EnrollmentApprovalPage })))
@@ -30,6 +32,8 @@ export function AppRouter() {
             <Route path="sources" element={<SourcesPage />} />
             <Route path="jobs" element={<ScansPage />} />
             <Route path="results" element={<ResultsPage />} />
+            <Route path="league" element={<LeaguePage />} />
+            <Route path="league/ip/:agentID/:targetIP" element={<IPTrendPage />} />
             <Route path="blacklist" element={<BlacklistPage />} />
             <Route path="agents" element={<AgentsPage />} />
             <Route path="settings" element={<SettingsPage />} />

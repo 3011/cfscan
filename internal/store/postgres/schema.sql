@@ -204,12 +204,14 @@ CREATE TABLE IF NOT EXISTS scan_tasks (
     job_id UUID NOT NULL REFERENCES scan_jobs(id) ON DELETE CASCADE,
     preferred_agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
     target_ip INET NOT NULL,
+    target_prefix CIDR,
     status TEXT NOT NULL DEFAULT 'pending',
     lease_until TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ,
     UNIQUE (job_id, preferred_agent_id, target_ip)
 );
+ALTER TABLE scan_tasks ADD COLUMN IF NOT EXISTS target_prefix CIDR;
 CREATE INDEX IF NOT EXISTS idx_scan_tasks_claim ON scan_tasks (preferred_agent_id, status, id);
 CREATE INDEX IF NOT EXISTS idx_scan_tasks_job ON scan_tasks (job_id, status);
 
@@ -219,6 +221,7 @@ CREATE TABLE IF NOT EXISTS scan_results (
     task_id BIGINT REFERENCES scan_tasks(id) ON DELETE SET NULL,
     agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
     target_ip INET NOT NULL,
+    target_prefix CIDR,
     available BOOLEAN NOT NULL,
     latency_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
     packet_loss DOUBLE PRECISION NOT NULL DEFAULT 100,
@@ -238,6 +241,7 @@ CREATE TABLE IF NOT EXISTS scan_results (
     scanned_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE scan_results ADD COLUMN IF NOT EXISTS task_id BIGINT REFERENCES scan_tasks(id) ON DELETE SET NULL;
+ALTER TABLE scan_results ADD COLUMN IF NOT EXISTS target_prefix CIDR;
 ALTER TABLE scan_results ADD COLUMN IF NOT EXISTS tcp_connect_ms DOUBLE PRECISION NOT NULL DEFAULT 0;
 ALTER TABLE scan_results ADD COLUMN IF NOT EXISTS tls_handshake_ms DOUBLE PRECISION NOT NULL DEFAULT 0;
 ALTER TABLE scan_results ADD COLUMN IF NOT EXISTS ttfb_ms DOUBLE PRECISION NOT NULL DEFAULT 0;
@@ -255,12 +259,44 @@ ALTER TABLE scan_results ALTER COLUMN colo SET DEFAULT '';
 ALTER TABLE scan_results ALTER COLUMN error_code SET DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_scan_results_agent_time ON scan_results (agent_id, scanned_at DESC);
 CREATE INDEX IF NOT EXISTS idx_scan_results_target_time ON scan_results (target_ip, scanned_at DESC);
+CREATE INDEX IF NOT EXISTS idx_scan_results_prefix_time ON scan_results (agent_id, target_prefix, scanned_at DESC) WHERE target_prefix IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_scan_results_latency ON scan_results (available, latency_ms, scanned_at DESC);
 CREATE INDEX IF NOT EXISTS idx_scan_results_facets ON scan_results (available, agent_id, colo) WHERE colo <> '';
 CREATE INDEX IF NOT EXISTS idx_scan_results_latest ON scan_results (agent_id, target_ip, scanned_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_scan_results_job_time ON scan_results (job_id, scanned_at DESC);
 CREATE INDEX IF NOT EXISTS idx_scan_results_scanned_at ON scan_results (scanned_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_results_task_unique ON scan_results (task_id);
+
+CREATE TABLE IF NOT EXISTS prefix_league_entries (
+    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    prefix_cidr CIDR NOT NULL,
+    scheme TEXT NOT NULL,
+    hostname TEXT NOT NULL,
+    path TEXT NOT NULL,
+    port INTEGER NOT NULL,
+    attempts INTEGER NOT NULL,
+    timeout_ms INTEGER NOT NULL,
+    tier TEXT NOT NULL DEFAULT 'observation' CHECK (tier IN ('observation', 'challenger', 'champion')),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    sample_count INTEGER NOT NULL DEFAULT 0,
+    distinct_ip_count INTEGER NOT NULL DEFAULT 0,
+    availability_rate DOUBLE PRECISION NOT NULL DEFAULT 0,
+    latency_p95_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
+    packet_loss_avg DOUBLE PRECISION NOT NULL DEFAULT 0,
+    recent_sample_count INTEGER NOT NULL DEFAULT 0,
+    recent_availability_rate DOUBLE PRECISION NOT NULL DEFAULT 0,
+    recent_latency_p95_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
+    recent_packet_loss_avg DOUBLE PRECISION NOT NULL DEFAULT 0,
+    bad_streak INTEGER NOT NULL DEFAULT 0,
+    last_result_at TIMESTAMPTZ,
+    last_scheduled_at TIMESTAMPTZ,
+    last_evaluated_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (agent_id, prefix_cidr, scheme, hostname, path, port, attempts, timeout_ms)
+);
+CREATE INDEX IF NOT EXISTS idx_prefix_league_tier ON prefix_league_entries (agent_id, tier, active, last_scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_prefix_league_updated ON prefix_league_entries (updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS blacklist_entries (
     agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,

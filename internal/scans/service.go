@@ -2,6 +2,7 @@ package scans
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +13,9 @@ import (
 
 type Store interface {
 	ListActivePrefixes(context.Context, bool) ([]model.Prefix, error)
-	CreateScanJob(context.Context, model.CreateScanJobRequest, []string) (model.ScanJob, error)
+	ResolveScanAgentIDs(context.Context, []string) ([]string, error)
+	PlanLeagueTargets(context.Context, model.CreateScanJobRequest, []model.Prefix, []string, string, bool) ([]model.AgentScanTargets, error)
+	CreateScanJob(context.Context, model.CreateScanJobRequest, []model.AgentScanTargets) (model.ScanJob, error)
 }
 
 type PrefixSyncer interface {
@@ -23,7 +26,10 @@ type PrefixSyncer interface {
 const (
 	SamplingModeCount        = "count"
 	SamplingModeOnePerPrefix = "one_per_prefix"
+	SamplingModeLeague       = "league"
 )
+
+var ErrNoLeagueTargetsDue = errors.New("no league targets are due")
 
 type Service struct {
 	store  Store
@@ -79,10 +85,10 @@ func ApplyDefaults(input *model.CreateScanJobRequest) {
 }
 
 func Validate(input model.CreateScanJobRequest) error {
-	if input.SamplingMode != SamplingModeCount && input.SamplingMode != SamplingModeOnePerPrefix {
-		return fmt.Errorf("sampling_mode must be count or one_per_prefix")
+	if input.SamplingMode != SamplingModeCount && input.SamplingMode != SamplingModeOnePerPrefix && input.SamplingMode != SamplingModeLeague {
+		return fmt.Errorf("sampling_mode must be count, one_per_prefix, or league")
 	}
-	if input.SamplingMode == SamplingModeCount && (input.TargetCount < 1 || input.TargetCount > targets.MaxSampleTargets) {
+	if (input.SamplingMode == SamplingModeCount || input.SamplingMode == SamplingModeLeague) && (input.TargetCount < 1 || input.TargetCount > targets.MaxSampleTargets) {
 		return fmt.Errorf("target_count must be between 1 and %d", targets.MaxSampleTargets)
 	}
 	if input.Scheme != "https" && input.Scheme != "http" {
@@ -141,15 +147,38 @@ func (s *Service) Create(ctx context.Context, input model.CreateScanJobRequest, 
 		}
 	}
 
-	seed := fmt.Sprintf("%s|%s|%s", kind, input.Name, time.Now().UTC().Format(time.RFC3339Nano))
-	var sampled []string
-	if input.SamplingMode == SamplingModeOnePerPrefix {
-		sampled, err = targets.OnePerPrefix(prefixes, input.IncludeIPv6, seed)
-	} else {
-		sampled, err = targets.Sample(prefixes, input.TargetCount, input.IncludeIPv6, seed)
-	}
+	agentIDs, err := s.store.ResolveScanAgentIDs(ctx, input.AgentIDs)
 	if err != nil {
 		return model.ScanJob{}, err
 	}
-	return s.store.CreateScanJob(ctx, input, sampled)
+	seed := fmt.Sprintf("%s|%s|%s", kind, input.Name, time.Now().UTC().Format(time.RFC3339Nano))
+	var agentTargets []model.AgentScanTargets
+	if input.SamplingMode == SamplingModeLeague {
+		agentTargets, err = s.store.PlanLeagueTargets(ctx, input, prefixes, agentIDs, seed, input.ForceLeague || kind != "scheduled")
+		if err != nil {
+			return model.ScanJob{}, err
+		}
+		total := 0
+		for _, item := range agentTargets {
+			total += len(item.Targets)
+		}
+		if total == 0 {
+			return model.ScanJob{}, ErrNoLeagueTargetsDue
+		}
+	} else {
+		var sampled []model.ScanTarget
+		if input.SamplingMode == SamplingModeOnePerPrefix {
+			sampled, err = targets.OnePerPrefix(prefixes, input.IncludeIPv6, seed)
+		} else {
+			sampled, err = targets.Sample(prefixes, input.TargetCount, input.IncludeIPv6, seed)
+		}
+		if err != nil {
+			return model.ScanJob{}, err
+		}
+		agentTargets = make([]model.AgentScanTargets, 0, len(agentIDs))
+		for _, agentID := range agentIDs {
+			agentTargets = append(agentTargets, model.AgentScanTargets{AgentID: agentID, Targets: sampled})
+		}
+	}
+	return s.store.CreateScanJob(ctx, input, agentTargets)
 }

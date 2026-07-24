@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const createScanJobSchema = z.object({
   name: z.string().trim().min(2, '请输入至少 2 个字符的任务名称').max(80, '任务名称不能超过 80 个字符'),
   agent_ids: z.array(z.string()),
-  sampling_mode: z.enum(['count', 'one_per_prefix']),
+  sampling_mode: z.enum(['count', 'one_per_prefix', 'league']),
   target_count: z.number().int().min(1).max(10_000),
   scheme: z.enum(['http', 'https']),
   hostname: z.string().trim().min(1, '请输入测试域名').refine((value) => !/[ /\\]/.test(value), '域名格式不正确'),
