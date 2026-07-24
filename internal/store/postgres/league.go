@@ -300,16 +300,32 @@ ORDER BY r.agent_id, r.target_prefix, r.candidate_rank`,
 	return items, rows.Err()
 }
 
-func (s *Store) GetLeagueDashboard(ctx context.Context, agentID string, limit int) (model.LeagueDashboard, error) {
-	if limit <= 0 || limit > 2000 {
-		limit = 500
+func normalizeLeaguePage(total, page, pageSize int) (int, int, int) {
+	if pageSize < 1 || pageSize > 500 {
+		pageSize = 50
 	}
+	if page < 1 {
+		page = 1
+	}
+	totalPages := 0
+	if total == 0 {
+		return 1, 0, 0
+	}
+	totalPages = (total + pageSize - 1) / pageSize
+	if page > totalPages {
+		page = totalPages
+	}
+	return page, totalPages, (page - 1) * pageSize
+}
+
+func (s *Store) GetLeagueDashboard(ctx context.Context, filter model.LeagueDashboardFilter) (model.LeagueDashboard, error) {
 	filterArgs := []any{}
 	condition := "e.active"
-	if agentID != "" {
-		filterArgs = append(filterArgs, agentID)
+	if filter.AgentID != "" {
+		filterArgs = append(filterArgs, filter.AgentID)
 		condition += fmt.Sprintf(" AND e.agent_id = $%d::uuid", len(filterArgs))
 	}
+
 	var summary model.LeagueSummary
 	if err := s.pool.QueryRow(ctx, fmt.Sprintf(`
 SELECT COUNT(*) FILTER (WHERE e.tier = 'observation')::int,
@@ -320,8 +336,16 @@ FROM prefix_league_entries e WHERE %s`, condition), filterArgs...).Scan(
 	); err != nil {
 		return model.LeagueDashboard{}, fmt.Errorf("summarize league prefixes: %w", err)
 	}
-	args := append(append([]any{}, filterArgs...), limit)
-	limitPosition := len(args)
+
+	prefixTotal := summary.ObservationPrefixes + summary.ChallengerPrefixes + summary.ChampionPrefixes
+	prefixPage, prefixTotalPages, prefixOffset := normalizeLeaguePage(prefixTotal, filter.PrefixPage, filter.PrefixPageSize)
+	prefixPageSize := filter.PrefixPageSize
+	if prefixPageSize < 1 || prefixPageSize > 500 {
+		prefixPageSize = 50
+	}
+	prefixArgs := append(append([]any{}, filterArgs...), prefixPageSize, prefixOffset)
+	prefixLimitPosition := len(prefixArgs) - 1
+	prefixOffsetPosition := len(prefixArgs)
 	rows, err := s.pool.Query(ctx, fmt.Sprintf(`
 SELECT e.agent_id::text, a.name, a.region, a.continent, e.prefix_cidr::text,
        e.scheme, e.hostname, e.path, e.port, e.attempts, e.timeout_ms, e.tier, e.active,
@@ -332,12 +356,12 @@ SELECT e.agent_id::text, a.name, a.region, a.continent, e.prefix_cidr::text,
 FROM prefix_league_entries e JOIN agents a ON a.id = e.agent_id
 WHERE %s
 ORDER BY CASE e.tier WHEN 'champion' THEN 0 WHEN 'challenger' THEN 1 ELSE 2 END,
-         e.availability_rate DESC, e.latency_p95_ms ASC, e.prefix_cidr
-LIMIT $%d`, condition, limitPosition), args...)
+         e.availability_rate DESC, e.latency_p95_ms ASC, e.prefix_cidr, e.agent_id
+LIMIT $%d OFFSET $%d`, condition, prefixLimitPosition, prefixOffsetPosition), prefixArgs...)
 	if err != nil {
 		return model.LeagueDashboard{}, fmt.Errorf("list league prefixes: %w", err)
 	}
-	prefixes := make([]model.PrefixLeagueEntry, 0)
+	prefixes := make([]model.PrefixLeagueEntry, 0, prefixPageSize)
 	for rows.Next() {
 		var item model.PrefixLeagueEntry
 		if err := rows.Scan(
@@ -353,17 +377,19 @@ LIMIT $%d`, condition, limitPosition), args...)
 		}
 		prefixes = append(prefixes, item)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return model.LeagueDashboard{}, err
+	}
 	rows.Close()
 
 	candidateCondition := "e.active AND e.tier IN ('champion', 'challenger')"
-	candidateArgs := []any{}
-	if agentID != "" {
-		candidateArgs = append(candidateArgs, agentID)
-		candidateCondition += fmt.Sprintf(" AND e.agent_id = $%d::uuid", len(candidateArgs))
+	candidateFilterArgs := []any{}
+	if filter.AgentID != "" {
+		candidateFilterArgs = append(candidateFilterArgs, filter.AgentID)
+		candidateCondition += fmt.Sprintf(" AND e.agent_id = $%d::uuid", len(candidateFilterArgs))
 	}
-	candidateArgs = append(candidateArgs, limit)
-	candidateLimitPosition := len(candidateArgs)
-	candidateRows, err := s.pool.Query(ctx, fmt.Sprintf(`
+	candidateCTE := fmt.Sprintf(`
 WITH ip_stats AS (
     SELECT e.agent_id, e.prefix_cidr, e.tier, e.scheme, e.hostname, e.path, e.port, e.attempts, e.timeout_ms, r.target_ip,
            COUNT(*)::int AS sample_count,
@@ -388,34 +414,59 @@ WITH ip_stats AS (
 ), selected AS (
     SELECT * FROM ranked WHERE candidate_rank <= 2
 )
+`, candidateCondition)
+
+	candidateTotal := 0
+	if err := s.pool.QueryRow(ctx, candidateCTE+`SELECT COUNT(*)::int FROM selected`, candidateFilterArgs...).Scan(&candidateTotal); err != nil {
+		return model.LeagueDashboard{}, fmt.Errorf("count league candidates: %w", err)
+	}
+	summary.CandidateIPs = candidateTotal
+	candidatePage, candidateTotalPages, candidateOffset := normalizeLeaguePage(candidateTotal, filter.CandidatePage, filter.CandidatePageSize)
+	candidatePageSize := filter.CandidatePageSize
+	if candidatePageSize < 1 || candidatePageSize > 500 {
+		candidatePageSize = 50
+	}
+	candidateArgs := append(append([]any{}, candidateFilterArgs...), candidatePageSize, candidateOffset)
+	candidateLimitPosition := len(candidateArgs) - 1
+	candidateOffsetPosition := len(candidateArgs)
+	candidateRows, err := s.pool.Query(ctx, candidateCTE+fmt.Sprintf(`
 SELECT s.agent_id::text, a.name, a.region, a.continent, s.prefix_cidr::text, s.tier,
-       s.scheme, s.hostname, s.path, s.port, s.attempts, s.timeout_ms, host(s.target_ip), COALESCE(s.colo, ''), s.sample_count, s.availability_rate,
-       s.latency_p95_ms, s.packet_loss_avg, s.last_scanned_at, COUNT(*) OVER()::int
+       s.scheme, s.hostname, s.path, s.port, s.attempts, s.timeout_ms, host(s.target_ip), COALESCE(s.colo, ''),
+       s.sample_count, s.availability_rate, s.latency_p95_ms, s.packet_loss_avg, s.last_scanned_at
 FROM selected s JOIN agents a ON a.id = s.agent_id
 ORDER BY CASE s.tier WHEN 'champion' THEN 0 ELSE 1 END,
-         s.availability_rate DESC, s.latency_p95_ms ASC
-LIMIT $%d`, candidateCondition, candidateLimitPosition), candidateArgs...)
+         s.availability_rate DESC, s.latency_p95_ms ASC, s.agent_id, s.prefix_cidr, s.target_ip
+LIMIT $%d OFFSET $%d`, candidateLimitPosition, candidateOffsetPosition), candidateArgs...)
 	if err != nil {
 		return model.LeagueDashboard{}, fmt.Errorf("list league candidates: %w", err)
 	}
-	candidates := make([]model.LeagueCandidate, 0)
-	candidateTotal := 0
+	candidates := make([]model.LeagueCandidate, 0, candidatePageSize)
 	for candidateRows.Next() {
 		var item model.LeagueCandidate
 		if err := candidateRows.Scan(&item.AgentID, &item.AgentName, &item.Region, &item.Continent,
 			&item.PrefixCIDR, &item.Tier, &item.Scheme, &item.Hostname, &item.Path, &item.Port, &item.Attempts, &item.TimeoutMS,
-			&item.TargetIP, &item.Colo, &item.SampleCount,
-			&item.AvailabilityRate, &item.LatencyP95MS, &item.PacketLossAvg, &item.LastScannedAt,
-			&candidateTotal); err != nil {
+			&item.TargetIP, &item.Colo, &item.SampleCount, &item.AvailabilityRate, &item.LatencyP95MS,
+			&item.PacketLossAvg, &item.LastScannedAt); err != nil {
 			candidateRows.Close()
 			return model.LeagueDashboard{}, err
 		}
 		candidates = append(candidates, item)
 	}
+	if err := candidateRows.Err(); err != nil {
+		candidateRows.Close()
+		return model.LeagueDashboard{}, err
+	}
 	candidateRows.Close()
 
-	summary.CandidateIPs = candidateTotal
-	return model.LeagueDashboard{Summary: summary, Prefixes: prefixes, Candidates: candidates}, nil
+	return model.LeagueDashboard{
+		Summary: summary,
+		Prefixes: model.PrefixLeaguePage{
+			Items: prefixes, Total: prefixTotal, Page: prefixPage, PageSize: prefixPageSize, TotalPages: prefixTotalPages,
+		},
+		Candidates: model.LeagueCandidatePage{
+			Items: candidates, Total: candidateTotal, Page: candidatePage, PageSize: candidatePageSize, TotalPages: candidateTotalPages,
+		},
+	}, nil
 }
 
 func (s *Store) GetIPTrend(ctx context.Context, filter model.IPTrendFilter) (model.IPTrend, error) {

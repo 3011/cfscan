@@ -493,10 +493,34 @@ type LeagueSummary struct {
 	CandidateIPs        int `json:"candidate_ips"`
 }
 
+type LeagueDashboardFilter struct {
+	AgentID           string
+	PrefixPage        int
+	PrefixPageSize    int
+	CandidatePage     int
+	CandidatePageSize int
+}
+
+type PrefixLeaguePage struct {
+	Items      []PrefixLeagueEntry `json:"items"`
+	Total      int                 `json:"total"`
+	Page       int                 `json:"page"`
+	PageSize   int                 `json:"page_size"`
+	TotalPages int                 `json:"total_pages"`
+}
+
+type LeagueCandidatePage struct {
+	Items      []LeagueCandidate `json:"items"`
+	Total      int               `json:"total"`
+	Page       int               `json:"page"`
+	PageSize   int               `json:"page_size"`
+	TotalPages int               `json:"total_pages"`
+}
+
 type LeagueDashboard struct {
 	Summary    LeagueSummary       `json:"summary"`
-	Prefixes   []PrefixLeagueEntry `json:"prefixes"`
-	Candidates []LeagueCandidate   `json:"candidates"`
+	Prefixes   PrefixLeaguePage    `json:"prefixes"`
+	Candidates LeagueCandidatePage `json:"candidates"`
 }
 
 type BlacklistEntry struct {

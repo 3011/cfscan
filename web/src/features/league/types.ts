@@ -52,6 +52,22 @@ export interface LeagueCandidate {
   last_scanned_at: string
 }
 
+export interface LeaguePage<T> {
+  items: T[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export interface LeagueDashboardFilters {
+  agent_id?: string
+  prefix_page: number
+  prefix_page_size: number
+  candidate_page: number
+  candidate_page_size: number
+}
+
 export interface LeagueDashboard {
   summary: {
     observation_prefixes: number
@@ -59,8 +75,8 @@ export interface LeagueDashboard {
     champion_prefixes: number
     candidate_ips: number
   }
-  prefixes: PrefixLeagueEntry[]
-  candidates: LeagueCandidate[]
+  prefixes: LeaguePage<PrefixLeagueEntry>
+  candidates: LeaguePage<LeagueCandidate>
 }
 
 export type TrendTimeRange = '24h' | '7d' | '30d'

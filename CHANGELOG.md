@@ -10,6 +10,10 @@ All notable public changes are documented here.
 - Added fixed candidate-IP retesting and a Best IP console with Agent-scoped candidate rankings plus 24-hour, 7-day, and 30-day latency and packet-loss trends.
 - Persisted the exact source prefix on scan tasks and results so overlapping CIDRs remain attributable without changing the Agent protocol.
 
+### Changed
+
+- Added independent server-side pagination for Best IP candidates and prefix standings while preserving the legacy league API response during rolling upgrades.
+
 ## [2.1.1] - 2026-07-20
 
 ### Fixed

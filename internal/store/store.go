@@ -65,7 +65,7 @@ type Store interface {
 	ListResults(context.Context, model.ResultFilter) (model.ResultPage, error)
 	ListResultColoFacets(context.Context, model.ResultFilter) ([]model.ResultColoFacet, error)
 	ListResultJobFacets(context.Context, model.ResultFilter) ([]model.ResultJobFacet, error)
-	GetLeagueDashboard(context.Context, string, int) (model.LeagueDashboard, error)
+	GetLeagueDashboard(context.Context, model.LeagueDashboardFilter) (model.LeagueDashboard, error)
 	GetIPTrend(context.Context, model.IPTrendFilter) (model.IPTrend, error)
 	ListBlacklist(context.Context, int) ([]model.BlacklistEntry, error)
 	GetBlacklistRecheckSettings(context.Context) (model.BlacklistRecheckSettings, error)

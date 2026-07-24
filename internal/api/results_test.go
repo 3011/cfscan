@@ -95,3 +95,55 @@ func TestTrendFilterRejectsInvalidOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestLeagueDashboardFilterDefaultsAndExplicitPaging(t *testing.T) {
+	request := httptest.NewRequest("GET", "/api/v1/league", nil)
+	filter, err := leagueDashboardFilterFromRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filter.AgentID != "" || filter.PrefixPage != 1 || filter.PrefixPageSize != 50 || filter.CandidatePage != 1 || filter.CandidatePageSize != 50 {
+		t.Fatalf("unexpected league defaults: %+v", filter)
+	}
+
+	request = httptest.NewRequest("GET", "/api/v1/league?agent_id=11111111-1111-4111-8111-111111111111&prefix_page=3&prefix_page_size=100&candidate_page=2&candidate_page_size=200", nil)
+	filter, err = leagueDashboardFilterFromRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filter.AgentID == "" || filter.PrefixPage != 3 || filter.PrefixPageSize != 100 || filter.CandidatePage != 2 || filter.CandidatePageSize != 200 {
+		t.Fatalf("unexpected league paging: %+v", filter)
+	}
+}
+
+func TestLeagueDashboardFilterRejectsInvalidPaging(t *testing.T) {
+	for _, path := range []string{
+		"/api/v1/league?agent_id=invalid",
+		"/api/v1/league?prefix_page=0",
+		"/api/v1/league?prefix_page_size=201",
+		"/api/v1/league?candidate_page=invalid",
+		"/api/v1/league?candidate_page_size=0",
+	} {
+		request := httptest.NewRequest("GET", path, nil)
+		if _, err := leagueDashboardFilterFromRequest(request); err == nil {
+			t.Fatalf("expected %s to fail", path)
+		}
+	}
+}
+
+func TestLeaguePaginationRequested(t *testing.T) {
+	legacy := httptest.NewRequest("GET", "/api/v1/league?limit=500", nil)
+	if leaguePaginationRequested(legacy) {
+		t.Fatal("legacy limit request must retain the array response")
+	}
+	for _, path := range []string{
+		"/api/v1/league?prefix_page=1",
+		"/api/v1/league?prefix_page_size=50",
+		"/api/v1/league?candidate_page=1",
+		"/api/v1/league?candidate_page_size=50",
+	} {
+		if !leaguePaginationRequested(httptest.NewRequest("GET", path, nil)) {
+			t.Fatalf("expected pagination for %s", path)
+		}
+	}
+}

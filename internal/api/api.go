@@ -628,19 +628,60 @@ func (a *API) getIPTrend(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, item)
 }
 
+func leagueDashboardFilterFromRequest(r *http.Request) (model.LeagueDashboardFilter, error) {
+	filter := model.LeagueDashboardFilter{AgentID: strings.TrimSpace(r.URL.Query().Get("agent_id"))}
+	if filter.AgentID != "" && !validUUID(filter.AgentID) {
+		return model.LeagueDashboardFilter{}, fmt.Errorf("agent_id must be a valid UUID")
+	}
+	var err error
+	if filter.PrefixPage, err = boundedQueryInt(r, "prefix_page", 1, 1, 1000000); err != nil {
+		return model.LeagueDashboardFilter{}, err
+	}
+	if filter.PrefixPageSize, err = boundedQueryInt(r, "prefix_page_size", 50, 1, 200); err != nil {
+		return model.LeagueDashboardFilter{}, err
+	}
+	if filter.CandidatePage, err = boundedQueryInt(r, "candidate_page", 1, 1, 1000000); err != nil {
+		return model.LeagueDashboardFilter{}, err
+	}
+	if filter.CandidatePageSize, err = boundedQueryInt(r, "candidate_page_size", 50, 1, 200); err != nil {
+		return model.LeagueDashboardFilter{}, err
+	}
+	return filter, nil
+}
+
+func leaguePaginationRequested(r *http.Request) bool {
+	query := r.URL.Query()
+	return query.Has("prefix_page") || query.Has("prefix_page_size") ||
+		query.Has("candidate_page") || query.Has("candidate_page_size")
+}
+
 func (a *API) getLeagueDashboard(w http.ResponseWriter, r *http.Request) {
-	agentID := strings.TrimSpace(r.URL.Query().Get("agent_id"))
-	if agentID != "" && !validUUID(agentID) {
-		writeError(w, http.StatusBadRequest, "invalid_request", "agent_id must be a valid UUID")
+	filter, err := leagueDashboardFilterFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	item, err := a.store.GetLeagueDashboard(
-		r.Context(),
-		agentID,
-		queryInt(r, "limit", 500),
-	)
+	paged := leaguePaginationRequested(r)
+	if !paged {
+		limit, limitErr := boundedQueryInt(r, "limit", 500, 1, 500)
+		if limitErr != nil {
+			writeError(w, http.StatusBadRequest, "invalid_request", limitErr.Error())
+			return
+		}
+		filter.PrefixPageSize = limit
+		filter.CandidatePageSize = limit
+	}
+	item, err := a.store.GetLeagueDashboard(r.Context(), filter)
 	if err != nil {
 		a.internalError(w, r, err)
+		return
+	}
+	if !paged {
+		writeJSON(w, http.StatusOK, struct {
+			Summary    model.LeagueSummary       `json:"summary"`
+			Prefixes   []model.PrefixLeagueEntry `json:"prefixes"`
+			Candidates []model.LeagueCandidate   `json:"candidates"`
+		}{Summary: item.Summary, Prefixes: item.Prefixes.Items, Candidates: item.Candidates.Items})
 		return
 	}
 	writeJSON(w, http.StatusOK, item)

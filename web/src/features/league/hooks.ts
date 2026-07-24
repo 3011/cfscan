@@ -1,11 +1,11 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import type { LeagueCandidate, TrendTimeRange } from '@/features/league/types'
+import type { LeagueCandidate, LeagueDashboardFilters, TrendTimeRange } from '@/features/league/types'
 import { getIPTrend, getLeagueDashboard } from '@/features/league/api'
 
-export function useLeagueDashboard(agentId: string) {
+export function useLeagueDashboard(filters: LeagueDashboardFilters) {
   return useQuery({
-    queryKey: ['prefix-league', agentId],
-    queryFn: () => getLeagueDashboard(agentId),
+    queryKey: ['prefix-league', filters],
+    queryFn: () => getLeagueDashboard(filters),
     refetchInterval: 30_000,
     placeholderData: keepPreviousData,
   })

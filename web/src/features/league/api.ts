@@ -1,8 +1,8 @@
 import { createQueryString, request } from '@/lib/http'
-import type { IPTrend, LeagueCandidate, LeagueDashboard, TrendTimeRange } from '@/features/league/types'
+import type { IPTrend, LeagueCandidate, LeagueDashboard, LeagueDashboardFilters, TrendTimeRange } from '@/features/league/types'
 
-export function getLeagueDashboard(agentId = '') {
-  return request<LeagueDashboard>(`/api/v1/league${createQueryString({ agent_id: agentId, limit: 500 })}`)
+export function getLeagueDashboard(filters: LeagueDashboardFilters) {
+  return request<LeagueDashboard>(`/api/v1/league${createQueryString(filters)}`)
 }
 
 export function getIPTrend(candidate: LeagueCandidate, timeRange: TrendTimeRange) {

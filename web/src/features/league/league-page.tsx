@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, Binoculars, Network, ShieldCheck, Swords, Trophy } from 'lucide-react'
+import { Activity, Binoculars, ChevronLeft, ChevronRight, Network, ShieldCheck, Swords, Trophy } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,7 +11,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PageSkeleton } from '@/components/shared/page-skeleton'
 import { useAgents } from '@/features/agents/hooks'
 import { useLeagueDashboard } from '@/features/league/hooks'
-import type { PrefixTier } from '@/features/league/types'
+import type { LeagueCandidate, PrefixTier } from '@/features/league/types'
 import { formatDate, formatMS, formatNumber, formatPercent } from '@/lib/format'
 
 const tierLabels: Record<PrefixTier, string> = {
@@ -25,7 +25,7 @@ function TierBadge({ tier }: { tier: PrefixTier }) {
   return <Badge variant={variant}>{tierLabels[tier]}</Badge>
 }
 
-function trendHref(item: import('@/features/league/types').LeagueCandidate) {
+function trendHref(item: LeagueCandidate) {
   const params = new URLSearchParams({
     prefix: item.prefix_cidr,
     tier: item.tier,
@@ -50,16 +50,76 @@ function SummaryCard({ title, value, description, icon: Icon }: { title: string;
   )
 }
 
+function TablePagination({
+  page,
+  pageSize,
+  total,
+  totalPages,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
+}) {
+  if (total === 0) return null
+  const first = (page - 1) * pageSize + 1
+  const last = Math.min(page * pageSize, total)
+  return (
+    <div className="flex flex-col gap-3 px-1 pt-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted-foreground">共 {formatNumber(total)} 条，当前 {formatNumber(first)}–{formatNumber(last)} 条</p>
+      <div className="flex items-center gap-2">
+        <Select
+          items={{ '50': '50 条', '100': '100 条', '200': '200 条' }}
+          value={String(pageSize)}
+          onValueChange={(value) => onPageSizeChange(Number(value))}
+        >
+          <SelectTrigger className="h-8 w-[92px]" aria-label="每页条数"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="50">50 条</SelectItem>
+            <SelectItem value="100">100 条</SelectItem>
+            <SelectItem value="200">200 条</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="min-w-20 text-center text-sm text-muted-foreground">{page} / {Math.max(totalPages, 1)}</span>
+        <Button variant="outline" size="icon" className="size-8" onClick={() => onPageChange(page - 1)} disabled={page <= 1} aria-label="上一页"><ChevronLeft /></Button>
+        <Button variant="outline" size="icon" className="size-8" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} aria-label="下一页"><ChevronRight /></Button>
+      </div>
+    </div>
+  )
+}
+
 export function LeaguePage() {
   const [agentId, setAgentId] = useState('')
+  const [candidatePage, setCandidatePage] = useState(1)
+  const [candidatePageSize, setCandidatePageSize] = useState(50)
+  const [prefixPage, setPrefixPage] = useState(1)
+  const [prefixPageSize, setPrefixPageSize] = useState(50)
   const agents = useAgents()
-  const league = useLeagueDashboard(agentId)
+  const league = useLeagueDashboard({
+    agent_id: agentId || undefined,
+    candidate_page: candidatePage,
+    candidate_page_size: candidatePageSize,
+    prefix_page: prefixPage,
+    prefix_page_size: prefixPageSize,
+  })
+
+  function changeAgent(value: string) {
+    setAgentId(value === 'all' ? '' : value)
+    setCandidatePage(1)
+    setPrefixPage(1)
+  }
 
   if (agents.isError) return <ErrorState title="Agent 列表加载失败" error={agents.error} onRetry={() => agents.refetch()} />
   if (league.isError) return <ErrorState title="最佳 IP 联赛加载失败" error={league.error} onRetry={() => league.refetch()} />
   if (!agents.data || !league.data) return <PageSkeleton rows={10} />
 
-  const { summary, candidates, prefixes } = league.data
+  const { summary } = league.data
+  const candidates = league.data.candidates.items
+  const prefixes = league.data.prefixes.items
   return (
     <div className="page-grid">
       <PageHeader
@@ -69,7 +129,7 @@ export function LeaguePage() {
           <Select
             items={Object.fromEntries([['all', '全部 Agent'], ...agents.data.items.map((agent) => [agent.id, agent.name])])}
             value={agentId || 'all'}
-            onValueChange={(value) => setAgentId(value === 'all' ? '' : value)}
+            onValueChange={changeAgent}
           >
             <SelectTrigger className="w-full sm:w-52" aria-label="联赛 Agent"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -100,7 +160,7 @@ export function LeaguePage() {
               <TableHeader><TableRow><TableHead>IP / colo</TableHead><TableHead>Agent</TableHead><TableHead>前缀</TableHead><TableHead>样本</TableHead><TableHead>可用率</TableHead><TableHead>P95 延迟</TableHead><TableHead>平均丢包</TableHead><TableHead>最近扫描</TableHead><TableHead><span className="sr-only">操作</span></TableHead></TableRow></TableHeader>
               <TableBody>
                 {candidates.map((item) => (
-                  <TableRow key={`${item.agent_id}-${item.target_ip}`}>
+                  <TableRow key={`${item.agent_id}-${item.target_ip}-${item.scheme}-${item.hostname}-${item.path}-${item.port}-${item.attempts}-${item.timeout_ms}`}>
                     <TableCell><p className="font-mono font-medium">{item.target_ip}</p><p className="mt-1 text-xs text-muted-foreground">{item.colo || '未识别 colo'}</p></TableCell>
                     <TableCell><p>{item.agent_name}</p><p className="mt-1 text-xs text-muted-foreground">{item.continent} / {item.region}</p></TableCell>
                     <TableCell><div className="flex items-center gap-2"><span className="font-mono text-xs">{item.prefix_cidr}</span><TierBadge tier={item.tier} /></div></TableCell>
@@ -115,6 +175,14 @@ export function LeaguePage() {
               </TableBody>
             </Table>
           )}
+          <TablePagination
+            page={league.data.candidates.page}
+            pageSize={league.data.candidates.page_size}
+            total={league.data.candidates.total}
+            totalPages={league.data.candidates.total_pages}
+            onPageChange={setCandidatePage}
+            onPageSizeChange={(value) => { setCandidatePageSize(value); setCandidatePage(1) }}
+          />
         </CardContent>
       </Card>
 
@@ -146,6 +214,14 @@ export function LeaguePage() {
               </TableBody>
             </Table>
           )}
+          <TablePagination
+            page={league.data.prefixes.page}
+            pageSize={league.data.prefixes.page_size}
+            total={league.data.prefixes.total}
+            totalPages={league.data.prefixes.total_pages}
+            onPageChange={setPrefixPage}
+            onPageSizeChange={(value) => { setPrefixPageSize(value); setPrefixPage(1) }}
+          />
         </CardContent>
       </Card>
     </div>
