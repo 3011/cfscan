@@ -55,7 +55,7 @@
     "typescript": "~6.0.0",
     "typescript-eslint": "^8.64.0",
     "vite": "^8",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "packageManager": "pnpm@11.12.0",
   "description": "Web console for CF Scanner, a distributed Cloudflare Anycast IP measurement platform.",
